@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Padel Analytics — Playback</title>
+  <style>
+    :root { --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --accent:#2f81f7; --good:#3fb950;
+            --text:#c9d1d9; --muted:#8b949e; --border:#30363d; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+           background: var(--bg); color: var(--text); display:flex; flex-direction:column; height:100vh; }
+    header { padding:10px 18px; background:var(--panel); border-bottom:1px solid var(--border);
+             display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+    header h1 { font-size:17px; margin:0; }
+    .pill { font-size:11px; padding:2px 8px; border-radius:10px; background:#21262d;
+            border:1px solid var(--border); color:var(--muted); }
+    .pill.done { color:var(--good); border-color:#2ea043; }
+    .pill.busy { color:#f78166; border-color:#da3633; }
+    .nav { margin-left:auto; font-size:13px; color:var(--accent); text-decoration:none;
+           background:#21262d; border:1px solid var(--border); padding:7px 12px; border-radius:8px; }
+    main { flex:1; display:flex; gap:14px; padding:14px; overflow:hidden; }
+    .left { flex:1; display:flex; flex-direction:column; gap:14px; min-width:0; }
+    .stage { flex:1; background:#000; border:1px solid var(--border); border-radius:10px;
+             overflow:hidden; display:flex; align-items:center; justify-content:center; min-height:0; }
+    .stage img { width:100%; height:100%; object-fit:contain; }
+
+    .trans { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:10px; }
+    .trans .row { display:flex; align-items:center; gap:12px; }
+    .trans .row > * { flex:0 0 auto; }
+    .trans .row input[type=range] { flex:1; min-width:80px; accent-color:var(--accent); }
+    .btn { background:var(--accent); color:#fff; border:0; border-radius:8px; padding:7px 12px;
+           font-size:13px; cursor:pointer; }
+    .btn:hover { filter:brightness(1.12); }
+    .btn.sm { padding:5px 9px; font-size:12px; }
+    .btn.sec { background:#21262d; border:1px solid var(--border); color:var(--text); }
+    .frame-info { font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; min-width:100px; }
+    .speed-label { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:4px; }
+    .speed-label select { background:#0d1117; border:1px solid var(--border); color:var(--text);
+                          border-radius:4px; padding:2px 4px; font-size:12px; }
+
+    .right { width:300px; display:flex; flex-direction:column; gap:12px; overflow-y:auto; }
+    .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:12px; }
+    .card h2 { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
+               margin:0 0 8px; }
+    .minimap-box { display:flex; flex-direction:column; }
+    #court { width:100%; height:220px; background:#0b0f14; border-radius:6px; }
+    .players { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .pcard { padding:8px; border-radius:8px; border-left:4px solid var(--border);
+             background:var(--panel2); }
+    .pcard .swatch { width:10px; height:10px; border-radius:50%; display:inline-block; }
+    .pcard .pname { font-size:11px; font-weight:600; display:flex; align-items:center; gap:5px; }
+    .pcard .pshots { font-size:22px; font-weight:700; line-height:1.1; margin:2px 0; }
+    .pcard .plabel { font-size:9px; color:var(--muted); text-transform:uppercase; }
+    .pcard .pmeta { font-size:10px; color:var(--muted); margin-top:3px; line-height:1.4; }
+    .pcard.dim { opacity:.45; }
+
+    .jobbar { display:flex; gap:8px; flex-wrap:wrap; }
+    .jobtab { background:var(--panel); border:1px solid var(--border); border-radius:8px;
+              padding:6px 10px; cursor:pointer; font-size:12px; }
+    .jobtab.active { border-color:var(--accent); background:#1c2640; }
+    .jobtab .sub { font-size:10px; color:var(--muted); display:block; }
+    .src-row { display:flex; gap:8px; align-items:center; }
+    .src-row input { flex:1; background:#0d1117; border:1px solid var(--border); color:var(--text);
+                     border-radius:8px; padding:7px; font-size:12px; }
+    .src-row button { margin-top:0; flex:0 0 auto; }
+
+    /* progress */
+    .prog { height:4px; background:#21262d; border-radius:2px; overflow:hidden; }
+    .prog .fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--good));
+                  transition:width .3s; }
+  </style>
+</head>
+<body>
+  {% include '_nav.html' %}
+  <header>
+    <h1>Playback</h1>
+    <span class="pill" id="statusPill">no job</span>
+    <span class="badge" id="jobInfo"></span>
+  </header>
+
+  <main>
+    <div class="left">
+      <div class="src-row card">
+        <input id="srcInput" placeholder="YouTube URL or local file path" />
+        <button class="btn" onclick="enqueueJob()">Analyze</button>
+        <button class="btn sec sm" onclick="forceReanalyze()">&#x21ba; redo</button>
+      </div>
+
+      <div class="jobbar" id="jobbar"></div>
+
+      <div class="stage">
+        <img id="playbackFrame" src="" alt="playback" />
+      </div>
+
+      <div class="trans">
+        <div class="row">
+          <button class="btn sm sec" id="btnPlay" onclick="togglePlay()">&#9654;</button>
+          <button class="btn sm sec" onclick="stepFrame(-1)">&#9194;</button>
+          <button class="btn sm sec" onclick="stepFrame(1)">&#9193;</button>
+          <input type="range" id="seekbar" min="1" max="1" value="1" oninput="seek(parseInt(this.value))" />
+          <span class="frame-info"><span id="curFrame">1</span>/<span id="totalFrames">–</span></span>
+          <span class="speed-label">&times;<select id="speedSel"><option>0.25</option><option selected>1</option><option>2</option><option>4</option></select></span>
+        </div>
+        <div class="prog" id="progBar"><div class="fill" id="progFill" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <aside class="right">
+      <div class="card minimap-box">
+        <h2>Court (frame <span id="minimapFrame">1</span>)</h2>
+        <canvas id="court" width="200" height="420"></canvas>
+      </div>
+
+      <div class="card">
+        <h2>Cumulative stats</h2>
+        <div class="players" id="playersGrid"></div>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    const COURT_W = 10.0, COURT_H = 20.0;
+    const SLOT_COLORS = {1:'#3fb950',2:'#a371f7',3:'#f778ba',4:'#79c0ff'};
+    const SLOT_NAMES = {1:'Player 1',2:'Player 2',3:'Player 3',4:'Player 4'};
+
+    let jobs = [];
+    let currentJob = null;           // source_id
+    let totalFrames = 0;
+    let curFrame = 1;
+    let playing = false;
+    let playTimer = null;
+    let speed = 1;
+    let jobMeta = null;
+
+    // ---- job management ---------------------------------------------------
+    async function loadJobs() {
+      jobs = await (await fetch('/api/jobs')).json();
+      renderJobbar();
+      // pick the first done job, or the active one
+      const target = currentJob && jobs.find(j=>j.source_id===currentJob)
+                    || jobs.find(j=>j.state==='done')
+                    || jobs[0];
+      if (target && target.source_id !== currentJob) {
+        await selectJob(target.source_id);
+      }
+    }
+
+    function renderJobbar() {
+      const bar = document.getElementById('jobbar');
+      bar.innerHTML = jobs.map(j => `
+        <div class="jobtab ${j.source_id===currentJob?'active':''}"
+             onclick="selectJob('${j.source_id}')">
+          ${j.source_id.slice(0,28)}${j.source_id.length>28?'...':''}
+          <span class="sub">${j.total_frames||'?'} fr · ${j.state}</span>
+        </div>`).join('');
+    }
+
+    async function selectJob(source_id) {
+      currentJob = source_id;
+      renderJobbar();
+      const meta = await (await fetch(`/api/jobs/${source_id}`)).json();
+      if (meta.error) return;
+      jobMeta = meta;
+      totalFrames = meta.total_frames || 0;
+      curFrame = 1;
+      playing = false; clearInterval(playTimer);
+      document.getElementById('btnPlay').textContent = '\u25B6';
+      document.getElementById('playbackFrame').src = '';
+      document.getElementById('curFrame').textContent = '1';
+      document.getElementById('totalFrames').textContent = totalFrames || '–';
+      document.getElementById('seekbar').max = totalFrames || 1;
+      document.getElementById('seekbar').value = 1;
+      updateStatus();
+      loadCumulativeStats();
+      await showFrame(1);
+    }
+
+    async function enqueueJob() {
+      const source = document.getElementById('srcInput').value.trim();
+      if (!source) return;
+      const meta = await (await fetch('/api/jobs', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({source, force: false})
+      })).json();
+      await loadJobs();
+      await selectJob(meta.source_id);
+      pollProgress();
+    }
+
+    async function forceReanalyze() {
+      const source = document.getElementById('srcInput').value.trim();
+      if (!source) return;
+      const meta = await (await fetch('/api/jobs', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({source, force: true})
+      })).json();
+      await loadJobs();
+      await selectJob(meta.source_id);
+      pollProgress();
+    }
+
+    function pollProgress() {
+      if (!currentJob) return;
+      fetch(`/api/jobs/${currentJob}`).then(r=>r.json()).then(meta => {
+        if (meta.state === 'running' || meta.state === 'queued') {
+          document.getElementById('progFill').style.width =
+            ((meta.frame || 0) / Math.max(meta.total_frames || 1, 1) * 100) + '%';
+          document.getElementById('totalFrames').textContent = meta.total_frames || '?';
+          updateStatus();
+          if (meta.state === 'running') setTimeout(pollProgress, 2000);
+        } else if (meta.state === 'done') {
+          document.getElementById('progFill').style.width = '100%';
+          loadJobs();
+          updateStatus();
+          loadCumulativeStats();
+          showFrame(curFrame);
+        }
+      });
+    }
+
+    // ---- playback ---------------------------------------------------------
+    async function showFrame(n) {
+      if (!currentJob) return;
+      const meta = jobMeta || {};
+      if (n < 1) n = 1;
+      if (n > (meta.total_frames||1e9)) n = meta.total_frames||1;
+      curFrame = n;
+      document.getElementById('curFrame').textContent = curFrame;
+      document.getElementById('seekbar').value = curFrame;
+      document.getElementById('playbackFrame').src =
+        `/api/jobs/${currentJob}/frame/${curFrame}`;
+      document.getElementById('minimapFrame').textContent = curFrame;
+      fetchFrameResult(curFrame);
+    }
+
+    async function fetchFrameResult(n) {
+      if (!currentJob) return;
+      const r = await (await fetch(`/api/jobs/${currentJob}/frame/${n}/result`)).json();
+      const players = r.players || [];
+      const colorPlayers = players.map(p => ({
+        slot: p.slot, court_xy: p.court_xy,
+        color: SLOT_COLORS[p.slot] || '#ccc'
+      }));
+      drawCourt(colorPlayers);
+    }
+
+    function stepFrame(delta) {
+      if (playing) togglePlay();
+      showFrame(curFrame + delta);
+    }
+
+    function seek(n) {
+      if (playing) togglePlay();
+      showFrame(n);
+    }
+
+    function togglePlay() {
+      if (!currentJob) return;
+      playing = !playing;
+      document.getElementById('btnPlay').textContent = playing ? '\u23F8' : '\u25B6';
+      if (playing) {
+        speed = parseFloat(document.getElementById('speedSel').value) || 1;
+        const meta = jobMeta || {};
+        const interval = 1000 / Math.max(meta.fps||30, 1) / speed;
+        playTimer = setInterval(() => {
+          if (curFrame >= totalFrames) { togglePlay(); return; }
+          showFrame(curFrame + 1);
+        }, interval);
+      } else {
+        clearInterval(playTimer); playTimer = null;
+      }
+    }
+
+    // ---- minimap ----------------------------------------------------------
+    function drawCourt(players) {
+      const cv = document.getElementById('court');
+      const ctx = cv.getContext('2d');
+      const W = cv.width, H = cv.height;
+      ctx.clearRect(0, 0, W, H);
+      const pad = 8;
+      const cw = W - pad*2, ch = H - pad*2;
+      ctx.fillStyle = '#0e3d2e'; ctx.fillRect(pad, pad, cw, ch);
+      const mx = m => pad + (m / COURT_W) * cw;
+      const my = m => pad + (m / COURT_H) * ch;
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(pad, my(COURT_H/2)); ctx.lineTo(W-pad, my(COURT_H/2)); ctx.stroke();
+      ctx.strokeStyle = '#9ad'; ctx.lineWidth = 1;
+      [6.95, 13.05].forEach(y => {
+        ctx.beginPath(); ctx.moveTo(pad, my(y)); ctx.lineTo(W-pad, my(y)); ctx.stroke();
+      });
+      ctx.beginPath(); ctx.moveTo(mx(COURT_W/2), my(6.95)); ctx.lineTo(mx(COURT_W/2), my(13.05)); ctx.stroke();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+      ctx.strokeRect(pad, pad, cw, ch);
+      players.forEach(p => {
+        if (!p.court_xy || p.court_xy.length < 2) return;
+        const x = mx(Math.max(0, Math.min(COURT_W, p.court_xy[0])));
+        const y = my(Math.max(0, Math.min(COURT_H, p.court_xy[1])));
+        ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI*2);
+        ctx.fillStyle = p.color; ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('P'+p.slot, x, y-10);
+      });
+    }
+
+    // ---- cumulative stats -------------------------------------------------
+    async function loadCumulativeStats() {
+      if (!currentJob) return;
+      const d = await (await fetch(`/api/jobs/${currentJob}/stats`)).json();
+      const players = d.players || [];
+      renderCumulativeStats(players);
+    }
+
+    function renderCumulativeStats(players) {
+      const grid = document.getElementById('playersGrid');
+      const bySlot = {};
+      players.forEach(p => bySlot[p.slot] = p);
+      let html = '';
+      for (let slot = 1; slot <= 4; slot++) {
+        const p = bySlot[slot];
+        const color = SLOT_COLORS[slot];
+        const active = p && p.frames_seen > 0;
+        const shots = p ? p.shots : 0;
+        const dist = p ? p.distance_m.toFixed(1) : '0.0';
+        const time = p ? p.time_on_court.toFixed(0) : '0';
+        html += `<div class="pcard ${active?'':'dim'}" style="border-left-color:${color}">
+          <div class="pname"><span class="swatch" style="background:${color}"></span>Player ${slot}</div>
+          <div class="pshots">${shots}</div>
+          <div class="plabel">shots</div>
+          <div class="pmeta">${dist} m moved<br>${time}s on court</div>
+        </div>`;
+      }
+      grid.innerHTML = html;
+    }
+
+    // ---- status -----------------------------------------------------------
+    function updateStatus() {
+      const meta = jobMeta || {};
+      const pill = document.getElementById('statusPill');
+      pill.textContent = 'state: ' + (meta.state || 'none');
+      pill.className = 'pill ' + (meta.state === 'done' ? 'done' : meta.state === 'running' ? 'busy' : '');
+      document.getElementById('jobInfo').textContent =
+        (meta.model||'') + (meta.calibrated ? ' · calibrated' : ' · uncalibrated');
+    }
+
+    // ---- init -------------------------------------------------------------
+    loadJobs();
+    setInterval(loadJobs, 8000);       // refresh job list (new jobs starting/finishing)
+    setInterval(pollProgress, 4000);   // update progress bar for running jobs
+    setInterval(loadCumulativeStats, 10000); // cumulative stats may change during analysis
+  </script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+# ============================================================================
+# BALL DETECTION — TrackNetV3 (heatmap regression, NOT a YOLO detector)
+# ----------------------------------------------------------------------------
+# The ball is ~8 px at 1080p and moves fast; we need ~45–60 fps live for accurate
+# shot/contact detection. A YOLOv26 detector at imgsz 960 sustains only ~15–25 fps
+# on Jetson Orin Nano, which cannot meet that cadence. TrackNetV3 (2D-UNet over
+# seq_len stacked RGB frames + a median background, gaussian/disk heatmap target)
+# is purpose-built for small fast balls and is the de-facto padel/tennis tracker.
+#
+# TrackNetV3 CANNOT use src/train.py (Ultralytics). It is trained by:
+#   python src/train_tracknet.py --epochs 30 --batch_size 8 --seq_len 8 --bg_mode concat
+# and the model/loss/conventions are vendored under third_party/tracknetv3/
+# (re-exported via src.tracknet). See third_party/tracknetv3/VENDOR_NOTICE.md.
+#
+# This file is the reference config — src/train_tracknet.py argparse defaults
+# mirror these values, and scripts/queue_ball_tracknet.sh launches with them.
+# ============================================================================
+
+model:
+  name: TrackNet            # 2D UNet heatmap regressor (vendored model.TrackNet)
+  seq_len: 8                # frames stacked per input -> 8 predicted heatmaps
+  bg_mode: concat           # prepend 1 median-bg frame -> in_dim = (seq_len+1)*3 = 27
+  in_dim: 27
+  out_dim: 8
+  input_hw: [288, 512]      # HEIGHT x WIDTH (TrackNet constants)
+  sigma: 2.5                # heat-map disk radius (px) at 288x512
+  heatmap_threshold: 0.5    # binarise predicted heatmap; largest contour -> ball
+
+pretrained:
+  source: "https://drive.google.com/file/d/1CfzE87a0f6LhBp0kniSl1-89zaLCZ8cA"
+  local: data/models/tracknet_pretrained/ckpts/TrackNet_best.pt
+  note: >
+    shuttlecock-pretrained TrackNetV3 weights (MIT, qaz812345/TrackNetV3).
+    Fine-tuned on our padel ball trajectories — start from these, not scratch.
+
+data:
+  # Produced by scripts/build_tracknet_dataset.py from padelTracker100 COCO ball JSONs.
+  # Layout: <split>/<rally_id>/{frames/N.png, label.csv (Frame,Visibility,X,Y), median.npz}
+  root: ./data/datasets/ball_tracknet
+  manifests: [manifest_train.txt, manifest_val.txt]
+  orig_hw: [1080, 1920]     # source frames (padelTracker100); coords in label.csv are original-px
+  median_samples: 64        # frames sampled to estimate each rally's median background
+  rally_len: 256            # consecutive-frame chunk size (= one trajectory/rally)
+  val_frac: 0.15
+  min_ball_ratio: 0.05      # drop rallies with fewer visible-ball frames than this
+
+train:
+  epochs: 30
+  batch_size: 8
+  optimizer: Adam
+  learning_rate: 0.001
+  lr_scheduler: ""          # "" or "StepLR" (step=epochs/3, gamma=0.1)
+  alpha: 0.5                # batch mixup (Beta(alpha,alpha)); 0 = off
+  loss: WBCELoss            # vendored utils.metric.WBCELoss (weighted BCE)
+  train_sliding_step: 1     # overlapping windows
+  val_sliding_step: 8       # = seq_len (non-overlapping)
+  workers: 4
+  seed: 13
+  device: 0                 # CUDA id; "cpu" to force CPU
+  save_dir: runs/tracknet   # -> TrackNet_best.pt, TrackNet_cur.pt (param_dict: seq_len, bg_mode)
+
+inference:
+  # Consumed by src/ball_tracker.py (TrackNetBallTracker), wired into PadelAnalyzer
+  # in place of the old YOLO ball stub (src/analyzer.py _load_ball).
+  weights: data/models/ball_best.pt     # our fine-tuned output (falls back to pretrained)
+  kalman_smoothing: true                # stabilise the per-frame centre into a trail
+  trail_len: 30                         # matches AnalysisResult.ball_trail window
+  seq_len: 8                            # must match the checkpoint's param_dict.seq_len

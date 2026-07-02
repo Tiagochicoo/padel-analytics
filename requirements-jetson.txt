@@ -1,0 +1,43 @@
+# ============================================================================
+# Padel Analytics — Jetson Orin Nano (live inference server)
+# Install on the Jetson under a venv on top of JetPack's system Python.
+#
+# IMPORTANT — do NOT pip-install torch / tensorrt here:
+#   * torch      -> install NVIDIA's Jetson PyTorch wheel first (matches JetPack)
+#                   https://docs.nvidia.com/deeplearning/pytorch-for-jetson-platform
+#   * tensorrt   -> comes from JetPack (python3 -m pip install nvidia-tensorrt
+#                   is NOT used; use the JetPack-shipped `import tensorrt`)
+#   * opencv     -> prefer the JetPack-preinstalled cv2 (built with GStreamer);
+#                   only fall back to the wheel below if the system one is missing.
+# ============================================================================
+
+# --- Models / inference ------------------------------------------------------
+ultralytics>=8.3.0          # YOLOv26 track/export; loads the 4 Ultralytics .pt/.engine
+opencv-python>=4.8.0        # video I/O + drawing (see note above re: system cv2)
+numpy>=1.24.0
+supervision>=0.21.0         # trackers / annotators helpers
+pyyaml>=6.0
+tqdm>=4.65.0
+
+# --- TrackNetV3 ball model (vendored under third_party/tracknetv3/) ----------
+pandas>=2.0.0               # CSV trajectory labels
+parse>=1.19.0               # vendored utils/general.py rally-id parsing
+Pillow>=9.0.0               # TrackNet frame resize + heatmap rendering
+
+# --- Heatmaps (post-match report + live panel) ------------------------------
+scipy>=1.10.0               # gaussian_kde density
+matplotlib>=3.7.0           # court-overlay rendering (Agg backend, headless)
+
+# --- Web server (the local-network dashboard the client views) --------------
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+jinja2>=3.1.0               # templates (live/report/training/playback)
+python-multipart>=0.0.9     # FastAPI form parsing
+
+# --- Optional source backends ------------------------------------------------
+yt-dlp>=2024.0.0            # only needed if analyzing YouTube sources (not for camera)
+
+# --- One-off (run once at setup, not at runtime) ----------------------------
+gdown>=4.7.0                # download pretrained TrackNetV3 weights from Google Drive
+
+# Note: TensorRT itself comes from JetPack (python3-tensorrt). No pip install.

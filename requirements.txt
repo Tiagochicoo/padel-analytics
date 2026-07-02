@@ -1,0 +1,39 @@
+# ============================================================================
+# Padel Analytics — Python dependencies (training / dev laptop)
+# Install AFTER torch+torchvision (CUDA build). See README §4.3.
+# ============================================================================
+
+# Core CV + deep learning -----------------------------------------------------
+ultralytics>=8.3.0          # YOLOv26 train/track/export + reID support
+opencv-python>=4.8.0        # video I/O + drawing
+numpy>=1.24.0
+supervision>=0.21.0         # trackers, annotators, zones (tracking/reID helpers)
+
+# Data + datasets -------------------------------------------------------------
+roboflow>=1.1.0             # dataset download API
+python-dotenv>=1.0.0        # load .env (Roboflow key)
+pyyaml>=6.0
+
+# Visualization / analysis ----------------------------------------------------
+matplotlib>=3.7.0
+tqdm>=4.65.0
+
+# TrackNetV3 ball detection (vendored under third_party/tracknetv3/) ----------
+pandas>=2.0.0               # CSV trajectory labels (Frame,Visibility,X,Y)
+parse>=1.19.0               # vendored utils/general.py rally-id parsing
+gdown>=4.7.0                # one-off download of pretrained TrackNetV3 weights (Google Drive)
+Pillow>=10.0.0              # TrackNet frame resize (PIL.Image)
+
+# Runtime (also needed on dev laptop for inference) ---------------------------
+scipy>=1.10.0               # linear_sum_assignment (player_tracker), gaussian_kde (heatmap)
+fastapi>=0.100.0            # web server
+uvicorn[standard]>=0.23.0  # ASGI server
+jinja2>=3.1.0              # HTML templates
+python-multipart>=0.0.6    # FastAPI form parsing
+
+# Testing ---------------------------------------------------------------------
+pytest>=7.4.0
+
+# Export helpers (optional — only needed to export ONNX manually) -------------
+# onnx>=1.14.0               # ultralytics pulls a compatible version automatically
+# onnxruntime-gpu>=1.17.0    # only if you want to run ONNX on the laptop

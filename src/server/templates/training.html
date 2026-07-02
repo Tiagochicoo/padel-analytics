@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Padel Analytics — Training</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root { --bg:#0d1117; --panel:#161b22; --accent:#2f81f7; --good:#3fb950;
+            --text:#c9d1d9; --muted:#8b949e; --border:#30363d; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+           background: var(--bg); color: var(--text); }
+    header { padding:12px 20px; background: var(--panel); border-bottom:1px solid var(--border);
+             display:flex; align-items:center; gap:16px; flex-wrap:wrap; position:sticky; top:0; z-index:5; }
+    header h1 { font-size:18px; margin:0; }
+    .badge { font-size:12px; color: var(--muted); }
+    .badge.dim { opacity:.8; }
+    .pill { font-size:11px; padding:3px 10px; border-radius:10px; background:#21262d;
+            border:1px solid var(--border); }
+    .pill.on { color:var(--good); border-color:#2ea043; }
+    .pill.off { color:#f85149; border-color:#da3633; }
+    .nav { margin-left:auto; font-size:13px; color:var(--accent); text-decoration:none;
+           background:#21262d; border:1px solid var(--border); padding:7px 12px; border-radius:8px; }
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 18px; }
+
+    .runbar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+    .runtab { background:var(--panel); border:1px solid var(--border); border-radius:8px;
+              padding:8px 12px; cursor:pointer; font-size:13px; }
+    .runtab.active { border-color:var(--accent); background:#1c2640; }
+    .runtab .sub { font-size:11px; color:var(--muted); display:block; }
+
+    /* training queue (planned configs) */
+    .queue { background:var(--panel); border:1px solid var(--border); border-radius:10px;
+             padding:14px; margin-bottom:16px; }
+    .queue h2 { font-size:12px; text-transform:uppercase; letter-spacing:.05em;
+                color:var(--muted); margin:0 0 10px; display:flex; align-items:center; gap:6px; }
+    .queue-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:10px; }
+    .qcard { background:#21262d; border:1px solid var(--border); border-radius:8px;
+             padding:10px 12px; display:flex; flex-direction:column; gap:4px; }
+    .qcard.done { opacity:.55; border-color:#2ea043; }
+    .qcard.running { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
+    .qcard.queued { border-style:dashed; }
+    .qcard .top-row { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; }
+    .qcard .qicon { font-size:14px; }
+    .qcard .qsub { font-size:11px; color:var(--muted); }
+    .qcard .qmeta { font-size:10px; color:var(--muted); display:flex; gap:8px; flex-wrap:wrap; }
+    .qcard .qstat { font-size:10px; padding:1px 7px; border-radius:8px; text-transform:uppercase;
+                    letter-spacing:.03em; font-weight:600; }
+    .qstat.done { background:#0d2818; color:#3fb950; }
+    .qstat.running { background:#0c1e3d; color:#2f81f7; }
+    .qstat.queued { background:#21262d; color:#8b949e; border:1px solid var(--border); }
+    @media (max-width: 860px) { .queue-grid { grid-template-columns:1fr; } }
+
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap:12px; margin-bottom:16px; }
+    .kpi { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px; }
+    .kpi .k { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+    .kpi .v { font-size:26px; font-weight:700; margin-top:4px; font-variant-numeric:tabular-nums; }
+    .kpi .sub { font-size:11px; color:var(--muted); }
+
+    .progress { background:var(--panel); border:1px solid var(--border); border-radius:10px;
+                padding:14px; margin-bottom:16px; }
+    .progress .bar { height:10px; background:#21262d; border-radius:5px; overflow:hidden; margin-top:8px; }
+    .progress .fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--good)); transition:width .5s; }
+    .progress .top { display:flex; justify-content:space-between; font-size:13px; }
+
+    .charts { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+    .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px; }
+    .card h2 { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:0 0 8px; }
+    .chartbox { height: 230px; position:relative; }
+
+    .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .cfg { font-size:12px; }
+    .cfg .row { display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid #21262d; }
+    .cfg .row .k { color:var(--muted); }
+    pre.log { background:#010409; border:1px solid var(--border); border-radius:8px; padding:10px;
+              font-size:11px; line-height:1.4; max-height:260px; overflow:auto; color:#8b949e;
+              font-family: ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre-wrap; word-break:break-word; }
+    @media (max-width: 860px){
+      .charts,.two-col{ grid-template-columns:1fr; }
+      .grid { grid-template-columns:repeat(2,1fr) !important; }
+      .progress .top { flex-wrap:wrap; gap:4px; }
+      .wrap { padding:12px; }
+    }
+    @media (max-width:480px) {
+      .grid { grid-template-columns:1fr !important; }
+      .kpi .v { font-size:20px; }
+    }
+
+    /* hoverable AI-term tooltips */
+    .term { border-bottom:1px dotted var(--muted); cursor:help; }
+    .term:hover { color:#fff; border-bottom-color:var(--accent); }
+    #tip { position:fixed; z-index:60; max-width:330px; background:#010409; color:#c9d1d9;
+           border:1px solid var(--accent); border-radius:8px; padding:9px 11px; font-size:12px;
+           line-height:1.5; box-shadow:0 6px 24px rgba(0,0,0,.55); pointer-events:none;
+           opacity:0; transition:opacity .12s; }
+    #tip.show { opacity:1; }
+    #tip b { color:var(--accent); }
+
+    button { background:var(--accent); color:#fff; border:0; border-radius:8px;
+             padding:7px 12px; font-size:13px; cursor:pointer; }
+    button.secondary { background:#21262d; border:1px solid var(--border); color:var(--text); }
+    button:hover { filter:brightness(1.12); }
+
+    /* training-samples gallery */
+    .gal-cats { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+    .gal-cat { font-size:11px; padding:4px 10px; border-radius:14px; background:#21262d;
+               border:1px solid var(--border); color:var(--muted); cursor:pointer; user-select:none; }
+    .gal-cat.active { background:#1c2640; border-color:var(--accent); color:#fff; }
+    .gal-cat .n { opacity:.6; margin-left:3px; }
+    .gallery { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; }
+    .gal-item { cursor:zoom-in; }
+    .gal-item img { width:100%; display:block; border-radius:8px; border:1px solid var(--border);
+                    background:#010409; aspect-ratio:16/10; object-fit:cover; }
+    .gal-item .cap { font-size:10px; color:var(--muted); margin-top:4px; line-height:1.3; }
+    .gal-tag { display:inline-block; font-size:9px; padding:1px 6px; border-radius:8px; margin-right:4px;
+               background:#21262d; border:1px solid var(--border); color:var(--muted); }
+    .gal-tag.live { color:var(--good); border-color:#2ea043; }
+    .gal-empty { color:var(--muted); font-size:12px; padding:8px 0; }
+    /* full-screen lightbox */
+    #lightbox { position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.96);
+                display:none; flex-direction:column; align-items:center; justify-content:center; }
+    #lightbox.show { display:flex; }
+    #lightbox .lb-img-wrap { flex:1; display:flex; align-items:center; justify-content:center;
+                             width:100%; overflow:hidden; position:relative; }
+    #lightbox img { max-width:96%; max-height:100%; object-fit:contain; border-radius:4px;
+                    transition:opacity .12s; }
+    #lightbox .lb-close { position:absolute; top:12px; right:12px; z-index:210;
+                          background:rgba(22,27,34,.85); border:1px solid var(--border);
+                          border-radius:50%; width:40px; height:40px; display:flex;
+                          align-items:center; justify-content:center; cursor:pointer; color:#c9d1d9; }
+    #lightbox .lb-close:hover { background:#f85149; color:#fff; border-color:#f85149; }
+    #lightbox .lb-nav { position:absolute; top:50%; transform:translateY(-50%); z-index:5;
+                        background:rgba(22,27,34,.6); border:1px solid var(--border);
+                        border-radius:50%; width:44px; height:44px; display:flex;
+                        align-items:center; justify-content:center; cursor:pointer; color:#c9d1d9; }
+    #lightbox .lb-prev { left:12px; }
+    #lightbox .lb-next { right:12px; }
+    #lightbox .lb-nav:hover { background:var(--accent); border-color:var(--accent); }
+    #lightbox .lb-caption { padding:10px 16px; font-size:12px; color:#8b949e; text-align:center;
+                            background:rgba(0,0,0,.4); width:100%; }
+    #lightbox .lb-caption b { color:#c9d1d9; }
+    @media (max-width:768px) {
+      #lightbox .lb-nav { display:none; }
+      .gallery { grid-template-columns:repeat(2,1fr); }
+    }
+  </style>
+</head>
+<body>
+  {% include '_nav.html' %}
+  <header>
+    <h1>Training Dashboard</h1>
+    <span class="pill off" id="statusPill">checking…</span>
+    <span class="badge" id="procBadge"></span>
+  </header>
+
+  <div class="wrap">
+    <div class="runbar" id="runbar"></div>
+
+    <div class="queue" id="queueSection">
+      <h2>Training Queue</h2>
+      <div class="queue-grid" id="queueGrid"></div>
+    </div>
+
+    <div class="progress card">
+      <div class="top">
+        <span><b id="runName">—</b> &nbsp;<span class="badge" id="runModel"></span> <span class="badge dim" id="runDataset" style="display:none"></span></span>
+        <span><span id="epochText">–/–</span> epochs &nbsp;&middot;&nbsp; <span id="progPct">0%</span></span>
+      </div>
+      <div class="bar"><div class="fill" id="progFill" style="width:0%"></div></div>
+    </div>
+
+    <div class="grid">
+      <div class="kpi"><div class="k"><span class="term" data-tip="mAP50">mAP50</span></div><div class="v" id="mAP50">–</div><div class="sub" id="mAP50sub"></div></div>
+      <div class="kpi"><div class="k"><span class="term" data-tip="mAP5095">mAP50-95</span></div><div class="v" id="mAP5095">–</div><div class="sub" id="mAP5095sub"></div></div>
+      <div class="kpi"><div class="k"><span class="term" data-tip="precision">Precision</span></div><div class="v" id="prec">–</div></div>
+      <div class="kpi"><div class="k"><span class="term" data-tip="recall">Recall</span></div><div class="v" id="rec">–</div></div>
+    </div>
+
+    <div class="grid" id="timeGrid">
+      <div class="kpi"><div class="k"><span class="term" data-tip="avg_epoch">Avg / epoch</span></div><div class="v" id="tAvg">–</div><div class="sub" id="tAvgSub"></div></div>
+      <div class="kpi"><div class="k"><span class="term" data-tip="cur_epoch_eta">This epoch left</span></div><div class="v" id="tEpoch">–</div><div class="sub" id="tEpochSub"></div></div>
+      <div class="kpi"><div class="k"><span class="term" data-tip="total_left">Total left</span></div><div class="v" id="tTotal">–</div><div class="sub" id="tTotalSub"></div></div>
+      <div class="kpi"><div class="k"><span class="term" data-tip="eta_done">Finishes at</span></div><div class="v" id="tEta" style="font-size:20px">–</div><div class="sub" id="tEtaSub"></div></div>
+    </div>
+
+    <div class="charts">
+      <div class="card"><h2><span class="term" data-tip="loss">Loss</span> (<span class="term" data-tip="box_loss">box</span> / <span class="term" data-tip="cls_loss">cls</span> / <span class="term" data-tip="dfl_loss">dfl</span>)</h2><div class="chartbox"><canvas id="lossChart"></canvas></div></div>
+      <div class="card"><h2><span class="term" data-tip="mAP">mAP</span> &amp; <span class="term" data-tip="precision">precision</span> / <span class="term" data-tip="recall">recall</span></h2><div class="chartbox"><canvas id="mapChart"></canvas></div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <h2>Training samples — what the model sees <span class="badge" id="galHint"></span></h2>
+      <div class="gal-cats" id="galCats"></div>
+      <div class="gallery" id="gallery"></div>
+    </div>
+
+    <div class="two-col">
+      <div class="card"><h2>Configuration</h2><div class="cfg" id="cfg"></div></div>
+      <div class="card"><h2>Live log tail</h2><pre class="log" id="log"></pre></div>
+    </div>
+  </div>
+
+  <div id="lightbox">
+    <button class="lb-close" onclick="closeLightbox()">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="lb-img-wrap" id="lbSwipeZone">
+      <div class="lb-nav lb-prev" onclick="lbPrev()">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </div>
+      <img id="lbImg" src="" alt="" />
+      <div class="lb-nav lb-next" onclick="lbNext()">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>
+    <div class="lb-caption" id="lbCap"></div>
+  </div>
+
+  <script>
+    let lossChart = null, mapChart = null;
+    let runs = [];
+    let currentRun = null;
+
+    async function loadOverview() {
+      const ov = await (await fetch('/api/training')).json();
+      const pill = document.getElementById('statusPill');
+      if (ov.training_running) {
+        pill.textContent = 'training: running'; pill.className = 'pill on';
+      } else {
+        pill.textContent = 'training: idle'; pill.className = 'pill off';
+      }
+      document.getElementById('procBadge').textContent = ov.process || '';
+      runs = ov.runs || [];
+      renderRunbar();
+      // auto-select only on first load (before the user clicks a tab);
+      // never yank their selection back to the active run on later polls.
+      if (currentRun === null) {
+        currentRun = (ov.active_run && ov.active_run.id) || (runs[0] && runs[0].id);
+      }
+      // if the chosen run disappeared, fall back gracefully
+      if (currentRun && !runs.some(r => r.id === currentRun)) {
+        currentRun = (ov.active_run && ov.active_run.id) || (runs[0] && runs[0].id) || null;
+      }
+      if (currentRun) await loadRun(currentRun);
+    }
+
+    function renderRunbar() {
+      const bar = document.getElementById('runbar');
+      bar.innerHTML = runs.map(r => {
+        const st = r.status || (r.active ? 'training' : 'done');
+        const label = st === 'training' ? '● live' : st === 'crashed' ? '⚠ crashed' : st === 'pending' ? '… pending' : 'done';
+        return `<div class="runtab ${r.id===currentRun?'active':''}" onclick="selectRun('${r.id}')">
+          ${r.id}
+          <span class="sub">${r.epochs_done}/${r.epochs_total||'?'} ep · ${label}</span>
+        </div>`;
+      }).join('');
+    }
+
+    function selectRun(id) { currentRun = id; renderRunbar(); loadRun(id); }
+
+    async function loadRun(id) {
+      const r = await (await fetch('/api/training/runs/'+id)).json();
+      if (!r || r.error) return;
+      const s = r.series || [];
+      const st = r.status || (r.active ? 'training' : 'done');
+      document.getElementById('runName').textContent = r.id + (r.active?'  ●':(st==='crashed'?'  ⚠':''));
+      document.getElementById('runModel').textContent = r.args.model || '';
+      const di = r.dataset_info || {};
+      const dsEl = document.getElementById('runDataset');
+      if (di.train_count || di.val_count) {
+        dsEl.textContent = `${(di.train_count||0).toLocaleString()} train · ${(di.val_count||0).toLocaleString()} val`;
+        dsEl.style.display = '';
+      } else { dsEl.style.display = 'none'; }
+      const total = r.epochs_total || 0;
+      document.getElementById('epochText').textContent = `${r.epochs_done}/${total||'?'}`;
+      const pct = total ? Math.round(r.progress*100) : 0;
+      document.getElementById('progPct').textContent = pct+'%';
+      document.getElementById('progFill').style.width = pct+'%';
+
+      const last = s[s.length-1] || {};
+      setKpi('mAP50', last.mAP50, 'mAP50sub', r.has_best?'best.pt saved':'');
+      setKpi('mAP5095', last.mAP50_95);
+      setKpi('prec', last.precision);
+      setKpi('rec', last.recall);
+
+      renderCfg(r.args);
+      renderTiming(r.timing, r.active, r.status);
+      const logEl = document.getElementById('log');
+      // stick to the bottom only when the user is already near it
+      const stick = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 24;
+      logEl.textContent = (r.log_tail||[]).join('\n') || '(no log)';
+      if (stick) logEl.scrollTop = logEl.scrollHeight;
+      drawCharts(s);
+      loadGallery();
+    }
+
+    function setKpi(id, v, subId, sub) {
+      document.getElementById(id).textContent = v==null?'–':(v*100).toFixed(1)+'%';
+      if (subId && sub) document.getElementById(subId).textContent = sub;
+    }
+
+    // ---- time estimation ----
+    function fmtDur(sec) {
+      if (sec==null || !isFinite(sec) || sec<0) return '–';
+      sec = Math.round(sec);
+      const d = Math.floor(sec/86400); sec%=86400;
+      const h = Math.floor(sec/3600);  sec%=3600;
+      const m = Math.floor(sec/60);    const s = sec%60;
+      if (d) return `${d}d ${h}h ${m}m`;
+      if (h) return `${h}h ${m}m`;
+      if (m) return `${m}m ${s}s`;
+      return `${s}s`;
+    }
+    function fmtClock(unixSec) {
+      if (!unixSec) return '–';
+      const d = new Date(unixSec*1000);
+      return d.toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    }
+    let _etaCountdown = null;
+    function renderTiming(t, active, status) {
+      const grid = document.getElementById('timeGrid');
+      const isCrashed = status === 'crashed';
+      // hide the whole strip when there is nothing to estimate (e.g. old runs w/o time column)
+      const hasAny = t && (t.per_epoch_sec!=null || t.total_remaining_sec!=null);
+      grid.style.display = hasAny ? '' : 'none';
+      if (!hasAny) return;
+      document.getElementById('tAvg').textContent = fmtDur(t.per_epoch_sec);
+      document.getElementById('tAvgSub').textContent = active ? 'running avg' : 'final avg';
+      const epLeft = active ? t.current_epoch_remaining_sec : null;
+      document.getElementById('tEpoch').textContent = fmtDur(epLeft);
+      const epProg = t.current_epoch_progress!=null ? (t.current_epoch_progress*100).toFixed(0)+'%' : '';
+      const epNum = active && t.current_epoch ? `epoch ${t.current_epoch}` : '';
+      document.getElementById('tEpochSub').textContent = [epNum, epProg].filter(Boolean).join(' · ');
+      document.getElementById('tTotal').textContent = active ? fmtDur(t.total_remaining_sec) : (isCrashed ? 'crashed' : 'done');
+      document.getElementById('tTotalSub').textContent = active ? `of ${fmtDur(t.elapsed_sec)} elapsed` : (isCrashed ? 'training crashed' : 'training complete');
+      document.getElementById('tEta').textContent = active ? fmtClock(t.eta_at) : '—';
+      // live second-by-second countdown on the total + ETA without hammering the API
+      if (_etaCountdown) clearInterval(_etaCountdown);
+      if (active && t.total_remaining_sec!=null) {
+        let rem = t.total_remaining_sec, eta = t.eta_at;
+        _etaCountdown = setInterval(()=>{
+          rem -= 1; eta += 1;
+          document.getElementById('tTotal').textContent = fmtDur(rem);
+          document.getElementById('tEta').textContent = fmtClock(eta);
+        }, 1000);
+      }
+    }
+
+    function renderCfg(args) {
+      const el = document.getElementById('cfg');
+      if (!args) { el.innerHTML='(none)'; return; }
+      el.innerHTML = Object.entries(args).map(([k,v]) => {
+        let vv = v==null?'':String(v);
+        if (vv.includes('/')) vv = vv.split('/').slice(-2).join('/');
+        const labeled = GLOSSARY[k] !== undefined;
+        const keyHtml = labeled ? `<span class="term" data-tip="${k}">${k}</span>` : k;
+        return `<div class="row"><span class="k">${keyHtml}</span><span>${vv}</span></div>`;
+      }).join('');
+    }
+
+    function drawCharts(s) {
+      const labels = s.map(x=>x.epoch);
+      const baseOpts = (yTitle)=>({
+        responsive:true, maintainAspectRatio:false, animation:false,
+        plugins:{legend:{labels:{color:'#8b949e',font:{size:11}}}},
+        scales:{
+          x:{ticks:{color:'#8b949e',font:{size:10}},grid:{color:'#21262d'}},
+          y:{title:{display:true,text:yTitle,color:'#8b949e'},ticks:{color:'#8b949e',font:{size:10}},grid:{color:'#21262d'}}
+        }
+      });
+      const mk=(label,data,color)=>({label,data,borderColor:color,backgroundColor:color+'33',tension:0.25,pointRadius:2,borderWidth:2,fill:false});
+
+      if (lossChart) lossChart.destroy();
+      lossChart = new Chart(document.getElementById('lossChart'),{type:'line',
+        data:{labels,datasets:[
+          mk('box_loss',s.map(x=>x.train_box_loss),'#2f81f7'),
+          mk('cls_loss',s.map(x=>x.train_cls_loss),'#f78166'),
+          mk('val_box_loss',s.map(x=>x.val_box_loss),'#3fb950'),
+          mk('val_cls_loss',s.map(x=>x.val_cls_loss),'#a371f7'),
+        ]},options:baseOpts('loss')});
+
+      if (mapChart) mapChart.destroy();
+      const mapData = {
+        labels, datasets:[
+          mk('mAP50',s.map(x=>x.mAP50),'#3fb950'),
+          mk('mAP50-95',s.map(x=>x.mAP50_95),'#2f81f7'),
+          mk('precision',s.map(x=>x.precision),'#f78166'),
+          mk('recall',s.map(x=>x.recall),'#a371f7'),
+        ]
+      };
+      const mapOpts = baseOpts(''); mapOpts.scales.y.max=1.0; mapOpts.scales.y.min=0;
+      mapChart = new Chart(document.getElementById('mapChart'),{type:'line',data:mapData,options:mapOpts});
+    }
+
+    // ---- AI-term tooltips -------------------------------------------------
+    const GLOSSARY = {
+      mAP50:    '<b>mAP@0.5</b> — the headline accuracy. A predicted box counts as a correct hit if it overlaps a real player by ≥50% (IoU). For finding players on a padel court this is the number to watch; 0.9+ is strong.',
+      mAP5095:  '<b>mAP@0.5–0.95</b> — the same idea averaged over increasingly strict overlap thresholds (50%→95%). Boxes must be placed very precisely, so it is always lower than mAP@0.5. The toughest accuracy metric.',
+      mAP:      '<b>mAP</b> — Mean Average Precision. How good the detections are overall, balancing both finding players and not inventing false ones. The single best summary of detector quality.',
+      precision:'<b>Precision</b> — of every box the model drew, the fraction that were real players (not ghosts/false alarms). High = it rarely invents players.',
+      recall:   '<b>Recall</b> — of every player actually on court, the fraction the model successfully found. High = it rarely misses a player.',
+      loss:     '<b>Training loss</b> — how wrong the model is, summed from three parts (box + cls + dfl). It should steadily fall as the model learns, then flatten out.',
+      box_loss: '<b>box loss</b> — error in each box\'s position &amp; size (x, y, w, h). Lower = tighter, better-fitting boxes around each player.',
+      cls_loss: '<b>cls loss</b> — classification error. How confidently &amp; correctly the model labels each box as a "player" rather than background. Lower = surer, correct labels.',
+      dfl_loss: '<b>dfl loss</b> — Distribution Focal Loss (a YOLO trick). Models each box edge as a spread of possible offsets instead of one guess, sharpening the edges. Lower = crisper boundaries.',
+      // ---- configuration terms ----
+      task:       '<b>task</b> — what the model learns. <b>detect</b> = draw boxes around players; <b>pose</b> = also predict keypoints (used for the court model).',
+      model:      '<b>model</b> — the starting network. <b>yolo26n.pt</b> = the nano (smallest/fastest) YOLOv26, pre-trained, then fine-tuned on our padel images. Bigger variants (s/m) are more accurate but slower.',
+      data:       '<b>data</b> — the dataset.yaml it trains on; points at the train/val image folders and the class names (e.g. "player").',
+      epochs:     '<b>epochs</b> — full passes over every training image. More = more learning, until it plateaus or starts overfitting to the training set.',
+      batch:      '<b>batch</b> — images processed together per optimizer step. Bigger = stabler, faster gradients but more GPU memory. <b>-1</b> = Ultralytics auto-sizes it to fit the GPU.',
+      imgsz:      '<b>imgsz</b> — images are resized to this square (px) before the model sees them. Bigger = more detail &amp; accuracy, but slower &amp; more memory. <b>640</b> is our sweet spot.',
+      device:     '<b>device</b> — the compute that runs training. <b>0</b> = first GPU; <b>cpu</b> = CPU (far slower).',
+      optimizer:  '<b>optimizer</b> — the rule that nudges weights to cut loss. <b>AdamW</b>/<b>auto</b> tunes the step size per-parameter; a robust default for detection.',
+      lr0:        '<b>lr0</b> — initial learning rate: how big each early training step is. Too high = unstable/diverges; too low = slow.',
+      cos_lr:     '<b>cos_lr</b> — when on, the learning rate glides down a cosine curve toward ~0: a gentle cool-down near the end that usually yields a small accuracy bump.',
+      close_mosaic:'<b>close_mosaic</b> — turns OFF the mosaic collage this many epochs before the end, so the model finishes on normal single images (cleaner, more realistic final boxes).',
+      mosaic:     '<b>mosaic</b> — augmentation that stitches 4 images into one, so the model sees varied player sizes/contexts. Higher = harder, more regularised training (good against overfitting).',
+      mixup:      '<b>mixup</b> — augmentation that blends two images+labels into a ghostly overlap. Helps the model cope with motion blur and players crossing on court.',
+      copy_paste: '<b>copy_paste</b> — augmentation that cuts out players and pastes them elsewhere, manufacturing extra player examples from limited data — valuable for our smaller dataset.',
+      patience:   '<b>patience</b> — stop early if validation hasn\'t improved for this many epochs (0/False = always train all epochs). Frees the GPU once the model has converged.',      name:       '<b>name</b> — the run\'s folder name under runs/detect (or runs/pose), where results.csv, args.yaml and weights/ are saved.',
+      save_dir:   '<b>save_dir</b> — full on-disk path where this run writes its weights, charts and logs.',
+      avg_epoch:    '<b>Avg / epoch</b> — median wall-clock time one training epoch takes (train + validate), derived from the cumulative time column Ultralytics writes in results.csv. Stable against early warmup spikes.',
+      cur_epoch_eta:'<b>This epoch left</b> — estimated time remaining for the epoch currently in progress, parsed live from the trainer\'s progress bar (batch count, iteration rate and elapsed time). Only shown while training is running.',
+      total_left:   '<b>Total left</b> — estimated time until the whole run finishes: remaining epochs × average epoch time, adjusted for how far the current epoch has already progressed.',
+      eta_done:     '<b>Finishes at</b> — wall-clock time (now + total remaining) at which training should complete, assuming the current pace holds. Updates live.',
+    };
+    const tip = document.createElement('div'); tip.id = 'tip'; document.body.appendChild(tip);
+    function positionTip(e) {
+      const pad = 14, r = tip.getBoundingClientRect();
+      let x = e.clientX + pad, y = e.clientY + pad;
+      if (x + r.width > innerWidth)  x = e.clientX - r.width - pad;
+      if (y + r.height > innerHeight) y = e.clientY - r.height - pad;
+      tip.style.left = Math.max(8, x) + 'px';
+      tip.style.top  = Math.max(8, y) + 'px';
+    }
+    // event delegation: works for static terms AND dynamically-rendered
+    // config rows without ever re-binding listeners.
+    function _tipMatch(t) {
+      const el = t && t.closest ? t.closest('[data-tip]') : null;
+      return el && GLOSSARY[el.dataset.tip] ? GLOSSARY[el.dataset.tip] : null;
+    }
+    document.addEventListener('mouseover', (e) => {
+      const html = _tipMatch(e.target); if (!html) return;
+      tip.innerHTML = html; tip.classList.add('show'); positionTip(e);
+    });
+    document.addEventListener('mousemove', (e) => { if (tip.classList.contains('show')) positionTip(e); });
+    document.addEventListener('mouseout', (e) => {
+      if (_tipMatch(e.target) && !_tipMatch(e.relatedTarget)) tip.classList.remove('show');
+    });
+
+    // ---- training-samples gallery ----
+    const CAT_LABEL = { train:'Training batches', predictions:'Val predictions',
+                        val_labels:'Val labels', dataset:'Dataset', chart:'Charts',
+                        val:'Validation', annotated:'Annotated samples', other:'Other' };
+    const CAT_ORDER = ['train','annotated','predictions','val_labels','dataset','chart','val','other'];
+    const CAP = {
+      train:'Augmented training batch — real images the model learns from (mosaic/mixup applied).',
+      annotated:'Random training images with ground-truth annotations overlaid (green boxes + keypoints). Drawn live from the dataset.',
+      predictions:'Model predictions on a fixed validation batch — refreshed each epoch, so you can watch the boxes improve.',
+      val_labels:'Ground-truth boxes on the same validation batch (what predictions are judged against).',
+      val:'Validation batch.', dataset:'Dataset overview — distribution of all box sizes/positions.',
+      chart:'Auto-generated metric plot (updates each epoch).', other:'Generated by the trainer.',
+    };
+    let _galAll = [], _galFilter = 'all', _galSig = '';
+    let _dsSamples = [];  // cached annotated sample filenames
+
+    function _imgUrl(item) {
+      if (item.category === 'annotated')
+        return `/api/training/runs/${currentRun}/dataset-sample/${item.name}`;
+      return `/api/training/runs/${currentRun}/image/${item.name}?t=${item.mtime}`;
+    }
+
+    async function loadGallery() {
+      if (!currentRun) return;
+      // fetch run-directory images + dataset samples in parallel
+      const [runRes, dsRes] = await Promise.allSettled([
+        fetch('/api/training/runs/'+currentRun+'/images').then(r=>r.json()),
+        fetch('/api/training/runs/'+currentRun+'/dataset-samples').then(r=>r.json()),
+      ]);
+      const runImgs = (runRes.status==='fulfilled' && runRes.value.images) || [];
+      if (dsRes.status==='fulfilled' && dsRes.value.samples) {
+        _dsSamples = dsRes.value.samples;
+      }
+      // build merged list: run images + annotated dataset samples
+      const annotated = _dsSamples.map((name,idx) => ({
+        name, category:'annotated', mtime:0, size:0,
+      }));
+      _galAll = [...runImgs, ...annotated];
+      const sig = currentRun + '::' + _galAll.map(i=>i.category+i.name+':'+i.mtime).join('|');
+      const changed = sig !== _galSig;
+      _galSig = sig;
+      renderGalCats();
+      if (changed) renderGallery();
+    }
+    function renderGalCats() {
+      const counts = {};
+      _galAll.forEach(i=>counts[i.category]=(counts[i.category]||0)+1);
+      const bar = document.getElementById('galCats');
+      const mk = (key,label,n)=>`<span class="gal-cat ${_galFilter===key?'active':''}" onclick="setGalFilter('${key}')">${label}<span class="n">${n}</span></span>`;
+      let html = mk('all','All',_galAll.length);
+      CAT_ORDER.filter(c=>counts[c]).forEach(c=> html += mk(c,CAT_LABEL[c]||c,counts[c]));
+      bar.innerHTML = html;
+      document.getElementById('galHint').textContent =
+        _galAll.length ? _galAll.length+' images' : '(appear as the trainer writes them)';
+    }
+    function setGalFilter(c){ _galFilter=c; renderGalCats(); renderGallery(); }
+    function renderGallery() {
+      const g = document.getElementById('gallery');
+      const items = _galFilter==='all' ? _galAll : _galAll.filter(i=>i.category===_galFilter);
+      if (!items.length) { g.innerHTML = '<div class="gal-empty">No preview images for this run yet. They appear once the trainer writes train_batch*.jpg and, after the first validation, val_batch*_pred.jpg.</div>'; return; }
+      g.innerHTML = items.map(i=>{
+        const live = i.category==='predictions' ? '<span class="gal-tag live">● live</span>' : '';
+        const url = _imgUrl(i);
+        return `<div class="gal-item" onclick="openLightbox('${i.category}::${i.name}')">
+          <img loading="lazy" src="${url}" alt="${i.name}" />
+          <div class="cap">${live}<span class="gal-tag">${CAT_LABEL[i.category]||i.category}</span>${i.name}</div>
+        </div>`;
+      }).join('');
+    }
+    // lightbox — full-screen, swipeable
+    let _lbList = [];
+    let _lbIdx = 0;
+    function _ids(){ return (_galFilter==='all'?_galAll:_galAll.filter(i=>i.category===_galFilter))
+                              .map(i=>i.category+'::'+i.name); }
+    function openLightbox(id){
+      _lbList = _ids();
+      _lbIdx = _lbList.indexOf(id);
+      if (_lbIdx < 0) _lbIdx = 0;
+      _lbRender();
+      document.getElementById('lightbox').classList.add('show');
+    }
+    function _lbRender() {
+      if (!_lbList.length) { closeLightbox(); return; }
+      const id = _lbList[_lbIdx];
+      const [cat, name] = id.split('::');
+      const it = _galAll.find(i => i.category===cat && i.name === name);
+      if (!it) return;
+      const img = document.getElementById('lbImg');
+      img.style.opacity = '0';
+      img.src = _imgUrl(it);
+      img.onload = () => { img.style.opacity = '1'; };
+      const pos = `(${_lbIdx + 1}/${_lbList.length})`;
+      const lbl = CAT_LABEL[it.category] || it.category;
+      document.getElementById('lbCap').innerHTML = `<b>${name}</b> · ${lbl} ${pos}`;
+    }
+    function lbNext() { if (!_lbList.length) return; _lbIdx = (_lbIdx + 1) % _lbList.length; _lbRender(); }
+    function lbPrev() { if (!_lbList.length) return; _lbIdx = (_lbIdx - 1 + _lbList.length) % _lbList.length; _lbRender(); }
+    function closeLightbox() { document.getElementById('lightbox').classList.remove('show'); }
+
+    // keyboard
+    document.addEventListener('keydown', e => {
+      const lb = document.getElementById('lightbox');
+      if (!lb.classList.contains('show')) return;
+      if (e.key === 'Escape') closeLightbox();
+      else if (e.key === 'ArrowRight') lbNext();
+      else if (e.key === 'ArrowLeft') lbPrev();
+    });
+
+    // touch swipe
+    let _swipeX = 0, _swipeY = 0;
+    const lbZone = document.getElementById('lbSwipeZone');
+    lbZone.addEventListener('touchstart', e => {
+      _swipeX = e.changedTouches[0].screenX;
+      _swipeY = e.changedTouches[0].screenY;
+    }, {passive: true});
+    lbZone.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].screenX - _swipeX;
+      const dy = e.changedTouches[0].screenY - _swipeY;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+        if (dx < 0) lbNext(); else lbPrev();
+      }
+    }, {passive: true});
+
+    loadOverview();
+    setInterval(loadOverview, 5000);   // refresh overview + active run
+    setInterval(()=>{ if(currentRun) loadRun(currentRun); }, 5000);
+  </script>
+</body>
+</html>

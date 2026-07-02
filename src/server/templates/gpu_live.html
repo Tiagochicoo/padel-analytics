@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PadelClutch — GPU Live Analysis</title>
+  <style>
+    :root { --bg:#0d1117; --panel:#161b22; --accent:#2f81f7; --text:#c9d1d9; --muted:#8b949e; --border:#30363d; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:ui-sans-serif,system-ui,sans-serif; background:var(--bg); color:var(--text); }
+    header { padding:10px 18px; background:var(--panel); border-bottom:1px solid var(--border);
+             display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+    header h1 { font-size:17px; margin:0; color:#58a6ff; }
+    .pill { font-size:11px; padding:2px 8px; border-radius:10px; background:#21262d; }
+    .pill.on { color:#3fb950; border-color:#2ea043; }
+    .pill.off { color:#f85149; }
+    .badge { font-size:12px; color:var(--muted); }
+    main { padding:14px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+    .stage { width:100%; max-width:1200px; background:#000; border:1px solid var(--border);
+             border-radius:10px; overflow:hidden; }
+    .stage img { width:100%; display:block; }
+    .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; max-width:1200px; width:100%; }
+    .controls input { flex:1; min-width:200px; background:#0d1117; border:1px solid var(--border);
+                      color:var(--text); border-radius:8px; padding:8px; font-size:13px; }
+    .btn { background:var(--accent); color:#fff; border:0; border-radius:8px; padding:8px 12px;
+           font-size:13px; cursor:pointer; }
+    .btn:hover { filter:brightness(1.12); }
+    .btn.danger { background:#da3633; }
+    .btn.sec { background:#21262d; border:1px solid var(--border); color:var(--text); }
+    .info { font-size:12px; color:var(--muted); max-width:1200px; width:100%; }
+    .info span { margin-right:16px; }
+  </style>
+</head>
+<body>
+  {% include '_nav.html' %}
+  <header>
+    <h1>⚡ GPU Live Analysis</h1>
+    <span class="pill off" id="statePill">idle</span>
+    <span class="badge" id="frameInfo"></span>
+  </header>
+  <main>
+    <div class="stage">
+      <img id="feed" src="" alt="GPU analysis stream" />
+    </div>
+    <div class="controls">
+      <input id="videoInput" placeholder="Video filename or path (e.g. highlights_day6_women.mp4)" />
+      <button class="btn" onclick="startAnalysis()">▶ Analyze</button>
+      <button class="btn sec" onclick="stopAnalysis()">⏹ Stop</button>
+      <label style="font-size:12px;color:var(--muted)">
+        Skip: <select id="skipSel">
+          <option value="1">1 (every frame)</option>
+          <option value="3">3</option>
+          <option value="5" selected>5</option>
+          <option value="15">15 (fast)</option>
+        </select>
+      </label>
+    </div>
+    <div class="info">
+      <span id="stateText">Ready. Enter a video filename and click Analyze.</span>
+    </div>
+  </main>
+  <script>
+    const feed = document.getElementById('feed');
+    const statePill = document.getElementById('statePill');
+    const frameInfo = document.getElementById('frameInfo');
+    const stateText = document.getElementById('stateText');
+
+    let pollTimer = null;
+
+    async function startAnalysis() {
+      const video = document.getElementById('videoInput').value.trim();
+      if (!video) { alert('Enter a video filename'); return; }
+      const skip = parseInt(document.getElementById('skipSel').value);
+      
+      document.getElementById('feed').src = '';  // clear
+      
+      const r = await fetch('/api/gpu/start', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ video, skip, real_time: skip === 1 })
+      });
+      const d = await r.json();
+      if (!d.ok) { alert('Error: ' + (d.error || 'unknown')); return; }
+      
+      // Start polling status
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(pollStatus, 1000);
+      
+      // Start feed after a brief delay
+      setTimeout(() => {
+        feed.src = '/gpu_feed?t=' + Date.now();
+        stateText.textContent = 'Loading GPU models and processing...';
+      }, 500);
+    }
+
+    async function stopAnalysis() {
+      await fetch('/api/gpu/stop', { method: 'POST' });
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      statePill.textContent = 'stopped';
+      statePill.className = 'pill off';
+      feed.src = '';
+      stateText.textContent = 'Analysis stopped.';
+    }
+
+    async function pollStatus() {
+      try {
+        const d = await (await fetch('/api/gpu/status')).json();
+        statePill.textContent = d.state;
+        statePill.className = 'pill ' + (d.state === 'running' ? 'on' : 'off');
+        frameInfo.textContent = d.state === 'running'
+          ? `frame ${d.frame}/${d.total}`
+          : '';
+        stateText.textContent = d.state === 'running'
+          ? `Processing ${d.video} — frame ${d.frame}/${d.total}`
+          : d.state === 'done'
+            ? '✅ Analysis complete!'
+            : d.state === 'stopped'
+              ? 'Analysis stopped.'
+              : d.state === 'failed'
+                ? '❌ Analysis failed. Check server logs.'
+                : 'Ready.';
+        if (d.state === 'done' || d.state === 'failed' || d.state === 'stopped') {
+          if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        }
+      } catch(e) {}
+    }
+
+    // Auto-refresh feed every 5s
+    setInterval(() => {
+      if (feed.src) {
+        feed.src = '/gpu_feed?t=' + Date.now();
+      }
+    }, 5000);
+  </script>
+</body>
+</html>

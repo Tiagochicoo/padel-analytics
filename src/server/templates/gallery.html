@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>PadelClutch — Pro Court Intelligence</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0a0e17;--panel:#111827;--panel2:#1a2332;--border:#1e3048;--accent:#22d3ee;--accent2:#6366f1;--text:#e2e8f0;--muted:#7c8ba8;--green:#22c55e;--red:#ef4444;--orange:#f59e0b}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+header{background:linear-gradient(135deg,var(--panel),#0f1825);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff}
+.brand h1{font-size:17px;font-weight:700;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.brand .tagline{font-size:10px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-top:-2px}
+.status-tag{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.dot.green{background:var(--green);animation:pulse 1.5s infinite}
+.dot.gray{background:var(--muted)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.layout{display:flex;flex:1;height:calc(100vh - 52px)}
+.sidebar{width:260px;min-width:260px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sidebar-title{padding:10px 14px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border);display:flex;justify-content:space-between}
+.sidebar-title .badge{font-size:10px;background:var(--panel2);padding:1px 6px;border-radius:6px}
+.vlist{flex:1;overflow-y:auto;padding:6px}
+.vlist::-webkit-scrollbar{width:4px}
+.vlist::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.vc{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px;cursor:pointer;transition:all .15s}
+.vc:hover{border-color:var(--accent)}
+.vc.selected{border-color:var(--accent);box-shadow:0 0 10px rgba(34,211,238,.12)}
+.vc .vn{font-size:12px;font-weight:600;margin-bottom:3px;line-height:1.3}
+.vc .vm{font-size:10px;color:var(--muted);display:flex;gap:8px;margin-bottom:4px}
+.vc .status-badge{font-size:9px;padding:1px 6px;border-radius:4px;display:inline-block}
+.vc .status-badge.ready{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+.vc .status-badge.pending{background:rgba(245,158,11,.15);color:var(--orange);border:1px solid rgba(245,158,11,.3)}
+.vc .status-badge.none{background:rgba(100,116,139,.15);color:var(--muted);border:1px solid rgba(100,116,139,.3)}
+.center{flex:1;display:flex;flex-direction:column;background:#000;min-width:0;position:relative}
+.stage{flex:1;display:flex;align-items:center;justify-content:center;background:#05080f;position:relative;overflow:hidden}
+.stage video{max-width:100%;max-height:100%;display:block}
+.stage canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+.stage .placeholder{color:var(--muted);text-align:center;padding:30px}
+.stage .placeholder .icon{font-size:40px;margin-bottom:8px;opacity:.3}
+.stage .placeholder h3{font-size:16px;color:var(--text);margin-bottom:4px}
+.stage .placeholder p{font-size:12px}
+.controls-bar{background:var(--panel);border-top:1px solid var(--border);padding:8px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11px}
+.controls-bar .play-btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer}
+.controls-bar .play-btn:hover{filter:brightness(1.15)}
+.controls-bar .play-btn:disabled{opacity:.3;cursor:not-allowed}
+.controls-bar .btn-sec{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer}
+.controls-bar .btn-sec:hover{border-color:var(--accent)}
+.controls-bar .btn-sec:disabled{opacity:.3;cursor:not-allowed}
+.controls-bar select{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:11px}
+.controls-bar .progress{flex:1;height:4px;background:var(--panel2);border-radius:2px;overflow:hidden}
+.controls-bar .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;transition:width .3s}
+.stats-panel{width:300px;min-width:300px;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.stats-header{padding:10px 14px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:1px solid var(--border)}
+.stats-body{flex:1;overflow-y:auto;padding:10px}
+.stats-body::-webkit-scrollbar{width:4px}
+.stats-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.mgrid{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.mc{background:var(--panel2);border:1px solid var(--border);border-radius:7px;padding:8px 10px}
+.mc .mh{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
+.mc .mn{font-size:11px;font-weight:600;display:flex;align-items:center;gap:5px}
+.mc .dot-s{width:6px;height:6px;border-radius:50%;display:inline-block}
+.mc .mcnt{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.mc .md{font-size:10px;color:var(--muted);display:flex;gap:10px}
+.summary-card{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px}
+.summary-card .sl{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px}
+.summary-card .sv{display:flex;justify-content:space-between;font-size:12px;padding:2px 0}
+.court-container{background:#0a0e17;border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px}
+.court-container .cl{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px}
+#courtCanvas{width:100%;aspect-ratio:2/1;background:linear-gradient(180deg,#0d1520,#162233);border-radius:5px;display:block}
+@media(max-width:1100px){.stats-panel{width:240px;min-width:240px}}
+@media(max-width:800px){.layout{flex-direction:column;height:auto}.sidebar{width:100%;min-width:0;max-height:180px;border-right:none;border-bottom:1px solid var(--border)}.center{min-height:350px}.stats-panel{width:100%;min-width:0;border-left:none;border-top:1px solid var(--border);max-height:280px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="brand-icon">⚡</div>
+    <div><h1>PadelClutch</h1><div class="tagline">pro court intelligence</div></div>
+  </div>
+  <div class="status-tag"><span class="dot" id="modeDot"></span><span id="modeLabel">Ready</span></div>
+</header>
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-title"><span>📹 Videos</span><span class="badge" id="vCount">0</span></div>
+    <div class="vlist" id="vList"></div>
+  </div>
+  <div class="center">
+    <div class="stage" id="stage">
+      <div class="placeholder" id="placeholder">
+        <div class="icon">🎯</div>
+        <h3>Select a video</h3>
+        <p>Choose from the library → Analyze → View stats</p>
+      </div>
+      <video id="vidPlayer" style="display:none" controls></video>
+      <canvas id="overlayCanvas" style="display:none"></canvas>
+    </div>
+    <div class="controls-bar" id="controlsBar">
+      <button class="play-btn" id="playBtn" disabled onclick="togglePlay()">▶ Play</button>
+      <button class="btn-sec" id="analyzeBtn" disabled onclick="startAnalyze()">🔬 Analyze</button>
+      <div class="progress" style="flex:1;max-width:300px"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      <span id="progressLabel" style="font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums"></span>
+    </div>
+  </div>
+  <div class="stats-panel">
+    <div class="stats-header">📊 Match Analytics</div>
+    <div class="stats-body" id="statsBody">
+      <div class="mgrid" id="mGrid"></div>
+      <div class="summary-card" id="summaryCard" style="display:none">
+        <div class="sl">Summary</div>
+        <div id="summaryData"></div>
+      </div>
+      <div class="court-container">
+        <div class="cl">🎾 Ball Trail</div>
+        <canvas id="courtCanvas" width="560" height="280"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const MODEL_COLORS={detector:'#58a6ff',player_specialist:'#22c55e',shot_classifier:'#f59e0b',ball_tracknet:'#ef4444'};
+const MODEL_LABELS={detector:'YOLO Detector',player_specialist:'Player Specialist',shot_classifier:'Shot Classifier',ball_tracknet:'TrackNet Ball'};
+let videos=[], selectedVideo=null, analysisData=null, analysisTimer=null;
+const vid=document.getElementById('vidPlayer'), canvas=document.getElementById('overlayCanvas'), ctx=canvas.getContext('2d');
+
+async function loadVideos(){
+  try{
+    const r=await fetch('/api/videos'), d=await r.json();
+    const list=document.getElementById('vList'); list.innerHTML='';
+    document.getElementById('vCount').textContent=d.videos.length;
+    for(const v of d.videos){
+      const card=document.createElement('div'); card.className='vc';
+      const aname=sanitizeName(v.filename);
+      card.innerHTML=`<div class="vn">${esc(v.filename)}</div>
+        <div class="vm"><span>📦${v.size_mb.toFixed(0)}MB</span><span>⏱${fmtDur(v.duration_s)}</span></div>
+        <div class="status-badge none" id="sb-${aname}">⏳ checking...</div>`;
+      card.onclick=()=>selectVideo(card,v);
+      list.appendChild(card);
+      // Check cache status
+      checkCache(v.filename,aname);
+    }
+    if(d.videos.length) selectVideo(list.firstChild,d.videos[0]);
+  }catch(e){document.getElementById('vList').innerHTML='<div style="padding:12px;color:var(--red);font-size:12px">Failed to load videos</div>'}
+}
+
+async function checkCache(filename,sname){
+  try{
+    const r=await fetch(`/api/gpu/results/${encodeURIComponent(filename)}`), d=await r.json();
+    const sb=document.getElementById(`sb-${sname}`);
+    if(!sb) return;
+    if(d.ok && d.cached){
+      sb.className='status-badge ready'; sb.textContent='✅ Analyzed';
+    }else{
+      sb.className='status-badge none'; sb.textContent='⚪ Not analyzed';
+    }
+  }catch(e){}
+}
+
+function selectVideo(card,v){
+  document.querySelectorAll('.vc').forEach(c=>c.classList.remove('selected'));
+  card.classList.add('selected'); selectedVideo=v;
+  stopPlayback(); setMode('idle','Ready');
+  document.getElementById('analyzeBtn').disabled=false;
+  document.getElementById('playBtn').disabled=true;
+  loadAnalysis(v.filename);
+}
+
+async function loadAnalysis(filename){
+  try{
+    const r=await fetch(`/api/gpu/results/${encodeURIComponent(filename)}`), d=await r.json();
+    if(d.ok && d.cached && d.data && d.data.results){
+      analysisData=d.data;
+      renderStats(analysisData);
+      document.getElementById('playBtn').disabled=false;
+      document.getElementById('analyzeBtn').textContent='🔄 Re-analyze';
+      setMode('ready','Analysis available');
+    }else{
+      analysisData=null;
+      clearStats();
+      document.getElementById('playBtn').disabled=true;
+      document.getElementById('analyzeBtn').textContent='🔬 Analyze';
+    }
+  }catch(e){analysisData=null;clearStats()}
+}
+
+function sanitizeName(n){return n.replace(/[^a-zA-Z0-9_-]/g,'_').substring(0,40)}
+
+async function startAnalyze(){
+  if(!selectedVideo) return;
+  setMode('running','Analyzing...');
+  document.getElementById('analyzeBtn').disabled=true;
+  document.getElementById('playBtn').disabled=true;
+  document.getElementById('progressFill').style.width='0%';
+  document.getElementById('progressLabel').textContent='Starting...';
+  const r=await fetch('/api/gpu/analyze-batch',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({video:selectedVideo.path,skip:15})
+  });
+  const d=await r.json();
+  if(!d.ok){setMode('idle','Failed');document.getElementById('analyzeBtn').disabled=false;return;}
+  if(analysisTimer) clearInterval(analysisTimer);
+  analysisTimer=setInterval(()=>pollBatch(d.job_id),2000);
+}
+
+async function pollBatch(jobId){
+  try{
+    const r=await fetch(`/api/gpu/batch-status/${jobId}`), d=await r.json();
+    const p=d.progress||0;
+    document.getElementById('progressFill').style.width=p+'%';
+    document.getElementById('progressLabel').textContent=`${d.frames_analyzed||0} frames (${p}%)`;
+    if(d.state==='done'){
+      clearInterval(analysisTimer); analysisTimer=null;
+      setMode('ready','Complete ✓');
+      document.getElementById('analyzeBtn').disabled=false;
+      document.getElementById('analyzeBtn').textContent='🔄 Re-analyze';
+      document.getElementById('playBtn').disabled=false;
+      // Reload analysis
+      const sname=sanitizeName(selectedVideo.filename);
+      const sb=document.getElementById(`sb-${sname}`);
+      if(sb){sb.className='status-badge ready';sb.textContent='✅ Analyzed'}
+      loadAnalysis(selectedVideo.filename);
+    }else if(d.state==='failed'){
+      clearInterval(analysisTimer); analysisTimer=null;
+      setMode('idle','Failed');document.getElementById('analyzeBtn').disabled=false;
+    }
+  }catch(e){}
+}
+
+function togglePlay(){
+  if(!analysisData) return;
+  const ph=document.getElementById('placeholder');
+  if(vid.style.display==='none'||vid.style.display===''){
+    ph.style.display='none'; vid.style.display='block'; canvas.style.display='block';
+    const vpath=selectedVideo.path;
+    vid.src=`/api/video-file?path=${encodeURIComponent(vpath)}`;
+    vid.play();
+    document.getElementById('playBtn').textContent='⏸ Pause';
+    requestAnimationFrame(drawOverlay);
+  }else if(vid.paused){vid.play();document.getElementById('playBtn').textContent='⏸ Pause'}
+  else{vid.pause();document.getElementById('playBtn').textContent='▶ Play'}
+}
+
+function drawOverlay(){
+  if(!vid||vid.paused||!analysisData){requestAnimationFrame(drawOverlay);return}
+  const vw=vid.videoWidth,vh=vid.videoHeight;
+  if(!vw||!vh){requestAnimationFrame(drawOverlay);return}
+  canvas.width=canvas.offsetWidth; canvas.height=canvas.offsetHeight;
+  const sx=canvas.width/vw, sy=canvas.height/vh;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const ct=vid.currentTime, results=analysisData.results||[];
+  // Find nearest frame
+  let nearest=null, minDiff=Infinity;
+  for(const r of results){
+    const diff=Math.abs(r.timestamp_s-ct);
+    if(diff<minDiff){minDiff=diff;nearest=r}
+  }
+  if(!nearest||minDiff>1){requestAnimationFrame(drawOverlay);return}
+  const dets=nearest.detections||{};
+  // Draw ball trail (all previous positions)
+  if(dets.ball_tracknet){
+    for(const bp of dets.ball_tracknet){
+      const bx=bp.x*sx*canvas.width, by=bp.y*sy*canvas.height;
+      ctx.beginPath();ctx.arc(bx,by,5,0,Math.PI*2);
+      ctx.fillStyle=`rgba(239,68,68,0.6)`;ctx.fill();
+      ctx.strokeStyle='#fff';ctx.lineWidth=1;ctx.stroke();
+    }
+  }
+  // Draw detector boxes
+  for(const [mname,mdets] of Object.entries(dets)){
+    if(mname==='ball_tracknet') continue;
+    const color=MODEL_COLORS[mname]||'#fff';
+    if(!Array.isArray(mdets)) continue;
+    for(const d of mdets){
+      const bbox=d.bbox||d;
+      if(bbox.length<4) continue;
+      const x1=bbox[0]*sx, y1=bbox[1]*sy, x2=bbox[2]*sx, y2=bbox[3]*sy;
+      ctx.strokeStyle=color;ctx.lineWidth=2;ctx.strokeRect(x1,y1,x2-x1,y2-y1);
+      const lbl=`${d.confidence?d.confidence.toFixed(2):''}`;
+      ctx.fillStyle=color;ctx.font='11px sans-serif';
+      ctx.fillText(lbl,x1+2,y1-4);
+    }
+  }
+  requestAnimationFrame(drawOverlay);
+}
+
+function stopPlayback(){
+  vid.pause();vid.style.display='none';canvas.style.display='none';
+  document.getElementById('placeholder').style.display='block';
+  document.getElementById('playBtn').textContent='▶ Play';
+}
+
+function setMode(state,label){
+  const dot=document.getElementById('modeDot'),lbl=document.getElementById('modeLabel');
+  dot.className='dot '+ (state==='running'?'green':'gray');
+  lbl.textContent=label;
+}
+
+function renderStats(data){
+  const grid=document.getElementById('mGrid');
+  const models=data.summary?.models||{};
+  const names=['detector','player_specialist','shot_classifier','ball_tracknet'];
+  let html='';
+  for(const n of names){
+    const m=models[n]||{};
+    const color=MODEL_COLORS[n]||'#fff',label=MODEL_LABELS[n]||n;
+    const conf=(m.avg_confidence||0)*100;
+    html+=`<div class="mc"><div class="mh">
+      <div class="mn"><span class="dot-s" style="background:${color}"></span>${label}</div>
+      <div class="mcnt" style="color:${color}">${m.total_detections||0}</div>
+    </div><div class="md">
+      <span>🎯${conf.toFixed(1)}% conf</span>
+      <span>⚡${(m.avg_latency_ms||0).toFixed(1)}ms</span>
+    </div></div>`;
+  }
+  grid.innerHTML=html;
+  const sc=document.getElementById('summaryCard');sc.style.display='block';
+  const sd=document.getElementById('summaryData');
+  const s=data.summary?.video||{};
+  sd.innerHTML=`<div class="sv"><span>Duration</span><span style="color:var(--accent)">${fmtDur(s.duration_s||0)}</span></div>
+    <div class="sv"><span>Frames analyzed</span><span style="color:var(--accent)">${(s.frames_analyzed||0).toLocaleString()}</span></div>
+    <div class="sv"><span>Ball detections</span><span style="color:#ef4444">${(s.total_ball_detections||0).toLocaleString()}</span></div>
+    <div class="sv"><span>Player detections</span><span style="color:#22c55e">${(s.total_player_detections||0).toLocaleString()}</span></div>`;
+  if(data.ball_trail) drawCourtTrail(data.ball_trail);
+}
+
+function clearStats(){
+  document.getElementById('mGrid').innerHTML='<div style="font-size:12px;color:var(--muted);padding:10px">No analysis data</div>';
+  document.getElementById('summaryCard').style.display='none';
+  document.getElementById('courtCanvas').getContext('2d').clearRect(0,0,560,280);
+}
+
+function drawCourtTrail(trail){
+  const c=document.getElementById('courtCanvas'),cx=c.getContext('2d');
+  const w=c.width,h=c.height;cx.clearRect(0,0,w,h);
+  cx.strokeStyle='#1e3048';cx.lineWidth=1;cx.strokeRect(10,10,w-20,h-20);
+  cx.beginPath();cx.moveTo(w/2,10);cx.lineTo(w/2,h-10);cx.stroke();
+  cx.strokeStyle='rgba(255,255,255,0.06)';cx.lineWidth=2;cx.setLineDash([4,6]);
+  cx.beginPath();cx.moveTo(10,h/2);cx.lineTo(w-10,h/2);cx.stroke();cx.setLineDash([]);
+  if(!trail||trail.length<2){if(trail?.length===1){cx.fillStyle='#ef4444';cx.beginPath();cx.arc(10+trail[0].x*(w-20),10+trail[0].y*(h-20),5,0,Math.PI*2);cx.fill()}return}
+  for(let i=1;i<trail.length;i++){
+    const a=.2+(i/trail.length)*.8;
+    cx.strokeStyle=`rgba(239,68,68,${a})`;cx.lineWidth=1.5+(i/trail.length)*2.5;
+    cx.beginPath();cx.moveTo(10+trail[i-1].x*(w-20),10+trail[i-1].y*(h-20));
+    cx.lineTo(10+trail[i].x*(w-20),10+trail[i].y*(h-20));cx.stroke();
+  }
+  const l=trail[trail.length-1];cx.fillStyle='#ef4444';cx.shadowColor='#ef4444';cx.shadowBlur=10;
+  cx.beginPath();cx.arc(10+l.x*(w-20),10+l.y*(h-20),5,0,Math.PI*2);cx.fill();cx.shadowBlur=0;
+}
+
+function fmtDur(s){const m=Math.floor(s/60);return `${m}:${Math.floor(s%60).toString().padStart(2,'0')}`}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+loadVideos();
+</script>
+</body>
+</html>

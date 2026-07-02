@@ -1,0 +1,37 @@
+# ============================================================================
+# Runtime inference configuration — read by src/infer.py
+# ============================================================================
+
+# Default weights (point these at your trained checkpoints)
+# Swap to small variants by changing *_best.pt → *_s_best.pt below.
+detection_weights: data/models/player_best.pt       # or player_s_best.pt
+pose_weights: data/models/court_best.pt              # or court_s_best.pt
+
+# Default input source: file path | camera index (int) | rtsp:// url
+source: data/sample_videos/match.mp4
+
+# Display / output
+show: true            # open an OpenCV window
+save: false           # write annotated video to data/sample_videos/out/
+imgsz: 640
+conf: 0.35            # confidence threshold
+iou: 0.5              # NMS / matching IoU threshold
+
+# Tracking (detection model only) — Ultralytics built-in trackers
+track:
+  enabled: true
+  tracker: botsort.yaml   # botsort.yaml (reID capable) or bytetrack.yaml
+  persist: true           # keep IDs across frames
+
+# Visualization
+draw:
+  boxes: true
+  track_ids: true
+  keypoints: true
+  skeleton: true
+  court_polygon: true     # connect court keypoints into a polygon
+
+# Colors per class id (BGR)
+colors:
+  player: [0, 255, 0]      # green
+  court: [0, 165, 255]     # orange

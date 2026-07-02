@@ -1,0 +1,69 @@
+# ============================================================================
+# data.yaml + training config — BODY POSE (YOLOv26-pose, 17 COCO keypoints)
+# Dataset: padelTracker100 (Zenodo) — 100k frames, ~400k person instances
+# with COCO 17-keypoint annotations (nose, eyes, ears, shoulders, elbows,
+# wrists, hips, knees, ankles).
+#
+# Integrates with player tracking: run this model instead of (or alongside)
+# the detection-only model to get body keypoints per player.  Those keypoints
+# feed into downstream shot classification (smash, lob, volley, vibora, etc.)
+#
+# Prerequisites:
+#   1. python scripts/extract_frames.py          # extract video frames as JPG
+#   2. python scripts/convert_coco_pose_to_yolo.py  # convert COCO -> YOLO-pose
+#
+# Train with: python src/train.py --task bodypose
+# ============================================================================
+
+base: yolo26n-pose.pt
+
+path: ./data/datasets/bodypose
+train: images/train
+val: images/val
+test: images/val
+
+nc: 1
+names:
+  0: person
+
+# 17 COCO body keypoints, each [x, y, visibility]
+kpt_shape: [17, 3]
+flip_idx: [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15]
+
+hyp:
+  name: bodypose
+  imgsz: 640
+  epochs: 100
+  batch: 8            # 4 GB VRAM
+  device: 0
+  workers: 8
+  optimizer: auto
+  cos_lr: true
+  warmup_epochs: 3.0
+  patience: 30
+  seed: 42
+  deterministic: true
+  amp: true
+
+  # Augmentation — keep keypoint geometry valid
+  mosaic: 0.0         # mosaic distorts small-player keypoints
+  close_mosaic: 10
+  mixup: 0.0
+  copy_paste: 0.0
+  hsv_h: 0.015
+  hsv_s: 0.6
+  hsv_v: 0.4
+  degrees: 0.0
+  translate: 0.1
+  scale: 0.5          # multi-scale helps with small players (~63px @ 1080p)
+  shear: 0.0
+  perspective: 0.0
+  flipud: 0.0
+  fliplr: 0.5         # horizontal flip (flip_idx handles left/right swap)
+
+  # Loss weights (pose)
+  pose: 12.0
+  kobj: 1.0
+  box: 7.5
+  cls: 0.3
+  dfl: 1.5

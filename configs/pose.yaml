@@ -1,0 +1,84 @@
+# ============================================================================
+# data.yaml + training config — COURT KEYPOINTS (YOLOv26 pose head)
+# Dataset: joshs-workspace-p1aa0/padel-court-detection (Roboflow, CC BY 4.0)
+# 26 keypoints covering: cage (8), court corners (8), net (4), service line (6)
+# Used for: (a) inside-court player filtering via polygon,
+#           (b) homography -> 2D court map / heatmaps,
+#           (c) serve box detection for scoring rules engine.
+#
+# After initial training, pseudo-label Plaimaker images for a v2 retrain.
+# Train with: python src/train.py --task pose
+# ============================================================================
+
+base: yolo26n-pose.pt
+
+path: ./data/datasets/court_keypoints_26
+train: images/train
+val: images/val
+test: images/val
+
+nc: 1
+names:
+  0: court
+
+# 26 keypoints per court, each [x, y, visibility]
+kpt_shape: [26, 3]
+flip_idx: [2, 3, 0, 1, 6, 7, 4, 5, 10, 11, 8, 9, 14, 15, 12, 13, 17, 16, 19, 18, 20, 21, 24, 25, 22, 23]
+
+# Keypoint index reference:
+#   0: cage_bottom_left_close    1: cage_bottom_left_far
+#   2: cage_bottom_right_close   3: cage_bottom_right_far
+#   4: cage_top_left_close       5: cage_top_left_far
+#   6: cage_top_right_close      7: cage_top_right_far
+#   8: court_bottom_left_close   9: court_bottom_left_far
+#  10: court_bottom_right_close 11: court_bottom_right_far
+#  12: court_top_left_close     13: court_top_left_far
+#  14: court_top_right_close    15: court_top_right_far
+#  16: net_bottom_left          17: net_bottom_right
+#  18: net_top_left             19: net_top_right
+#  20: service_centre_close     21: service_centre_far
+#  22: service_left_close       23: service_left_far
+#  24: service_right_close      25: service_right_far
+
+# Keypoints flip with geometry -> disable random flips/rotations to keep
+# the court shape valid (flip_idx handles fliplr augmentation only).
+flipud: false
+fliplr: false
+degrees: 0.0
+
+hyp:
+  name: court-keypoints
+  imgsz: 640
+  epochs: 600
+  batch: 8
+  device: 0
+  workers: 8
+  optimizer: AdamW
+  lr0: 0.001
+  patience: 80
+  cos_lr: true
+  warmup_epochs: 3.0
+  seed: 42
+  deterministic: true
+  amp: true
+
+  # Augmentation (pose-safe — keep court geometry valid)
+  mosaic: 0.0
+  mixup: 0.0
+  copy_paste: 0.0
+  hsv_h: 0.015
+  hsv_s: 0.6
+  hsv_v: 0.4
+  degrees: 0.0
+  translate: 0.05
+  scale: 0.3
+  shear: 0.0
+  perspective: 0.0
+  flipud: 0.0
+  fliplr: 0.0
+
+  pose: 12.0
+  kobj: 1.0
+  box: 7.5
+  cls: 0.3
+  dfl: 1.5

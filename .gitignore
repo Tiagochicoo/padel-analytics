@@ -1,0 +1,25 @@
+# --- data & large artifacts (preserved on disk / Pi NFS, not in git) ---
+data/
+logs/
+*.log
+*.mp4
+*.avi
+*.mkv
+*.pt
+*.pth
+*.onnx
+*.engine
+*.plan
+# --- python ---
+.venv/
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+# --- misc ---
+.DS_Store
+*.tmp
+node_modules/
+
+# secrets
+.env

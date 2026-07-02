@@ -1,0 +1,39 @@
+# ============================================================================
+# padel-analytics.service — systemd unit for auto-start on Jetson boot
+# ============================================================================
+# Install:
+#   sudo cp scripts/padel-analytics.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable padel-analytics
+#   sudo systemctl start padel-analytics
+#
+# Logs:
+#   journalctl -u padel-analytics -f
+#
+# Stop / restart:
+#   sudo systemctl stop padel-analytics
+#   sudo systemctl restart padel-analytics
+# ============================================================================
+
+[Unit]
+Description=Padel Analytics Live Server
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=tpereira
+WorkingDirectory=/home/tpereira/rep/padel-analytics
+EnvironmentFile=/home/tpereira/rep/padel-analytics/.env
+Environment=CAMERA_INDEX=0
+Environment=INFERENCE_DEVICE=0
+Environment=CLEAN_HUD=1
+Environment=PORT=8000
+ExecStart=/home/tpereira/rep/padel-analytics/.venv/bin/python -m src.server.app
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

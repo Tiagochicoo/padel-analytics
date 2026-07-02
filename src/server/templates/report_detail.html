@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ brand.name }} — Match Report</title>
+  <style>
+    :root { --bg:#0d1117; --panel:#161b22; --accent:{{ brand.accent }}; --good:#3fb950;
+            --text:#c9d1d9; --muted:#8b949e; --border:#30363d; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;
+           background:var(--bg); color:var(--text); }
+    header { padding:12px 20px; background:var(--panel); border-bottom:1px solid var(--border);
+             display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+    header h1 { font-size:18px; margin:0; }
+    .badge { font-size:12px; color:var(--muted); }
+    .back { font-size:13px; color:var(--accent); text-decoration:none;
+            background:#21262d; border:1px solid var(--border); padding:7px 12px;
+            border-radius:8px; display:flex; align-items:center; gap:6px; }
+    .back:hover { filter:brightness(1.2); }
+    .wrap { max-width:1100px; margin:0 auto; padding:18px; }
+    .card { background:var(--panel); border:1px solid var(--border); border-radius:10px;
+            padding:14px; margin-bottom:16px; }
+    .card h2 { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
+               margin:0 0 8px; }
+    .scorebar { display:flex; justify-content:space-around; align-items:center; padding:10px 0; }
+    .scorebar .v { font-size:48px; font-weight:800; font-variant-numeric:tabular-nums; }
+    .scorebar .k { font-size:11px; color:var(--muted); text-transform:uppercase; }
+    .meta { font-size:12px; color:var(--muted); line-height:1.6; }
+    .meta b { color:var(--text); }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; }
+    .pplayer { background:#0d1117; border:1px solid var(--border); border-radius:8px; padding:10px; }
+    .pplayer .hd { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+    .pplayer .nm { font-weight:700; }
+    .pplayer .tm { font-size:10px; padding:2px 8px; border-radius:10px; background:#21262d;
+                  border:1px solid var(--border); }
+    .pplayer .row { display:flex; justify-content:space-between; font-size:12px; padding:2px 0; }
+    .pplayer .row .k { color:var(--muted); }
+    .pplayer img { width:100%; border-radius:6px; margin-top:8px; border:1px solid var(--border);
+                   background:#010409; }
+    .pill { font-size:10px; padding:1px 6px; border-radius:8px; background:#21262d;
+            border:1px solid var(--border); margin-right:4px; }
+    .empty { text-align:center; padding:60px; color:var(--muted); }
+    .teams { display:flex; gap:16px; }
+    .teams .t { flex:1; background:#0d1117; border:1px solid var(--border); border-radius:8px; padding:10px; }
+    ul { list-style:none; padding:0; margin:0; max-height:240px; overflow:auto; font-size:12px; }
+    li { padding:4px 0; border-bottom:1px solid #21262d; }
+    .del-btn { background:#21262d; border:1px solid #da3633; border-radius:8px; padding:7px 14px;
+               font-size:13px; cursor:pointer; color:#f85149; display:flex; align-items:center; gap:6px; }
+    .del-btn:hover { background:#f85149; color:#fff; }
+    .court-card { display:flex; gap:16px; }
+    .court-card .left { flex:0 0 180px; }
+    .court-card canvas { width:100%; border-radius:8px; background:#0a3d2a; }
+    .court-card .legend { font-size:11px; color:var(--muted); margin-top:8px; line-height:1.6; }
+    .court-card .legend .dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:4px; }
+    @media (max-width:768px) {
+      .wrap { padding:12px; }
+      .court-card { flex-direction:column; }
+      .court-card .left { flex:none; margin:0 auto; }
+      .teams { flex-direction:column; }
+      .scorebar .v { font-size:36px; }
+      .grid { grid-template-columns:1fr; }
+      .del-btn { padding:6px 10px; font-size:12px; }
+    }
+  </style>
+</head>
+<body>
+  {% include '_nav.html' %}
+  <header>
+    <a class="back" href="/report">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      All Reports
+    </a>
+    <h1>Match Report</h1>
+    <span class="badge" id="srcBadge"></span>
+    <button class="del-btn" id="delBtn" style="margin-left:auto;display:none" onclick="delReport()">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      Delete
+    </button>
+  </header>
+
+  <div class="wrap">
+    <div id="loading" class="empty">Loading report…</div>
+    <div id="notfound" class="empty" style="display:none">Report not found.</div>
+
+    <div id="report" style="display:none">
+      <div class="card">
+        <h2>Final score</h2>
+        <div class="scorebar">
+          <div style="text-align:center"><div class="k">Team A</div><div class="v" id="scoreA">0</div></div>
+          <div style="font-size:16px;color:var(--muted)">vs</div>
+          <div style="text-align:center"><div class="k">Team B</div><div class="v" id="scoreB">0</div></div>
+        </div>
+        <div class="meta" id="meta" style="text-align:center"></div>
+      </div>
+
+      <div class="card">
+        <h2>Court layout</h2>
+        <div class="court-card">
+          <div class="left">
+            <canvas id="courtCanvas" width="120" height="240"></canvas>
+          </div>
+          <div class="legend" style="flex:1">
+            <p><b>Court dimensions:</b> 20m × 10m</p>
+            <p><b>Net:</b> at 10m centre, height ~88-92cm</p>
+            <p><b>Service lines:</b> 6.95m from each back wall</p>
+            <p><b>Centre line:</b> divides service area into left/right</p>
+            <p style="margin-top:8px;color:var(--muted)">Player heatmaps below show position density over the full court.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Teams</h2>
+        <div class="teams" id="teams"></div>
+      </div>
+
+      <div class="card">
+        <h2>Players</h2>
+        <div class="grid" id="players"></div>
+      </div>
+
+      <div class="card">
+        <h2>Shot log</h2>
+        <ul id="shotlog"></ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const MATCH_ID = '{{ match_id }}';
+
+    function teamLbl(t){ return t==null?'—':(t===0?'Team A':'Team B'); }
+
+    async function load() {
+      try {
+        const r = await (await fetch('/api/reports/' + MATCH_ID)).json();
+        if (r.error) {
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('notfound').style.display = '';
+          return;
+        }
+        render(r);
+      } catch (e) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('notfound').style.display = '';
+      }
+    }
+
+    function render(r) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('report').style.display = '';
+      document.getElementById('delBtn').style.display = '';
+      document.getElementById('srcBadge').textContent = r.meta && r.meta.source ? r.meta.source : '';
+      document.getElementById('scoreA').textContent = (r.score && r.score[0]!=null) ? r.score[0] : 0;
+      document.getElementById('scoreB').textContent = (r.score && r.score[1]!=null) ? r.score[1] : 0;
+      const m = r.meta || {};
+      const match = m.match || {};
+      const dt = m.generated_at ? new Date(m.generated_at).toLocaleString() : '';
+      document.getElementById('meta').innerHTML =
+        `${dt} · ${m.duration_sec||0}s played · ${r.rallies||0} rallies · ${r.total_shots||0} shots` +
+        (match.started_by ? ` <span class="badge">· started: ${match.started_by}</span>` : '');
+      // teams
+      const pt = r.per_team || {};
+      document.getElementById('teams').innerHTML = ['0','1'].map(t =>
+        `<div class="t"><div class="k" style="font-size:11px;color:var(--muted)">${teamLbl(parseInt(t))}</div>
+         <div class="row"><span class="k">points</span><b>${(pt[t]||{}).points||0}</b></div>
+         <div class="row"><span class="k">shots</span><b>${(pt[t]||{}).shots||0}</b></div>
+         <div class="row"><span class="k">players</span><b>${(pt[t]||{}).players||0}</b></div></div>`).join('');
+      // players
+      document.getElementById('players').innerHTML = (r.per_player||[]).filter(p=>p.active).map(p => {
+        const bytype = Object.entries(p.shots_by_type||{}).map(([t,n])=>`<span class="pill">${t}: ${n}</span>`).join('');
+        return `<div class="pplayer">
+          <div class="hd"><span class="nm">${p.name}</span><span class="tm">${teamLbl(p.team)}</span></div>
+          <div class="row"><span class="k">time on court</span><span>${p.time_on_court||0}s</span></div>
+          <div class="row"><span class="k">distance</span><span>${p.distance_m||0} m</span></div>
+          <div class="row"><span class="k">shots</span><span>${p.shots||0}</span></div>
+          ${bytype ? `<div style="margin:4px 0">${bytype}</div>`:''}
+          <img src="/api/reports/${MATCH_ID}/asset/${p.heatmap}?t=${Date.now()}" alt="${p.name} heatmap"
+               onerror="this.style.display='none'" />
+        </div>`; }).join('');
+      // shot log
+      const ul = document.getElementById('shotlog');
+      const log = r.shot_log || [];
+      ul.innerHTML = log.length ? log.slice(-50).reverse().map(s =>
+        `<li><b style="color:var(--accent)">${s.name||('P'+s.slot)}</b> · ${teamLbl(s.team)} — ${s.type}
+         <span class="badge" style="float:right">f${s.frame}</span></li>`).join('')
+         : '<li class="empty">No shots recorded.</li>';
+    }
+
+    function drawCourt() {
+      const cv = document.getElementById('courtCanvas');
+      const ctx = cv.getContext('2d');
+      const W = cv.width, H = cv.height;
+      const pad = 6;
+      const cw = W - pad*2, ch = H - pad*2;
+      const COURT_W = 10, COURT_H = 20;
+      const mx = m => pad + (m / COURT_W) * cw;
+      const my = m => pad + (m / COURT_H) * ch;
+
+      ctx.clearRect(0, 0, W, H);
+      // Service area backgrounds
+      ctx.fillStyle = '#0e2a1e';
+      ctx.fillRect(mx(0), my(0), cw, (6.95/COURT_H)*ch);
+      ctx.fillRect(mx(0), my(13.05), cw, ((20-13.05)/COURT_H)*ch);
+      // Court background
+      ctx.fillStyle = '#0a3d2a';
+      ctx.fillRect(pad, pad, cw, ch);
+      // Re-draw service area backgrounds on top of court bg
+      ctx.fillStyle = 'rgba(14,42,30,0.6)';
+      ctx.fillRect(mx(0), my(0), cw, (6.95/COURT_H)*ch);
+      ctx.fillRect(mx(0), my(13.05), cw, ((20-13.05)/COURT_H)*ch);
+
+      // Net (solid + dashed)
+      ctx.strokeStyle = '#e6edf3'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(pad, my(10)); ctx.lineTo(W-pad, my(10)); ctx.stroke();
+      ctx.setLineDash([3,3]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(pad, my(10)); ctx.lineTo(W-pad, my(10)); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Service lines
+      ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1.2;
+      [6.95, 13.05].forEach(y => {
+        ctx.beginPath(); ctx.moveTo(pad, my(y)); ctx.lineTo(W-pad, my(y)); ctx.stroke();
+      });
+      // Centre service line (two segments: service→net each side)
+      ctx.lineWidth = 0.8; ctx.setLineDash([2,2]);
+      ctx.beginPath(); ctx.moveTo(mx(5), my(6.95)); ctx.lineTo(mx(5), my(10)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(mx(5), my(10)); ctx.lineTo(mx(5), my(13.05)); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Outer boundary
+      ctx.strokeStyle = '#e6edf3'; ctx.lineWidth = 1.8;
+      ctx.strokeRect(pad, pad, cw, ch);
+
+      // Labels
+      ctx.fillStyle = '#64748b'; ctx.font = '8px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('NEAR', W/2, H-3);
+      ctx.fillText('FAR', W/2, pad+8);
+    }
+
+    async function delReport() {
+      if (!confirm('Delete this report permanently? This cannot be undone.')) return;
+      try {
+        const r = await (await fetch('/api/reports/' + MATCH_ID, { method: 'DELETE' })).json();
+        if (r.ok) window.location.href = '/report';
+        else alert('Could not delete: ' + (r.error || 'unknown'));
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    drawCourt();
+    load();
+  </script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+# ============================================================================
+# data.yaml + training config — COMBINED player detection
+# Roboflow (octovar/player-padal-dataset) + PadelTracker100 (Zenodo)
+# Train with: python src/train.py --task detection_combined
+# Run src/build_combined_dataset.py first to assemble this dataset.
+# ============================================================================
+
+base: yolo26n.pt
+
+path: ./data/datasets/combined
+train: images/train
+val: images/val
+test: images/val
+
+nc: 1
+names:
+  0: player
+
+# Same accuracy-maximizing hyperparameters as detection.yaml
+hyp:
+  name: player-detect
+  imgsz: 640
+  epochs: 100
+  batch: 8            # 4 GB VRAM
+  device: 0
+  workers: 8
+  optimizer: auto
+  cos_lr: true
+  warmup_epochs: 3.0
+  patience: 30
+  seed: 42
+  deterministic: true
+  amp: true
+
+  # Augmentation
+  mosaic: 1.0
+  close_mosaic: 15
+  mixup: 0.15
+  copy_paste: 0.15
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+  degrees: 0.0
+  translate: 0.1
+  scale: 0.5
+  shear: 0.0
+  perspective: 0.0
+  flipud: 0.0
+  fliplr: 0.5
+
+  box: 7.5
+  cls: 0.5
+  dfl: 1.5

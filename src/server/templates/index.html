@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Padel Analytics — Analysis</title>
+  <style>
+    :root { --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --accent:#2f81f7;
+            --text:#c9d1d9; --muted:#8b949e; --border:#30363d; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg); color: var(--text);
+      display: flex; flex-direction: column; height: 100vh;
+    }
+    header {
+      padding: 10px 18px; background: var(--panel); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    }
+    header h1 { font-size: 17px; margin: 0; }
+    header .badge { font-size: 12px; color: var(--muted); }
+    .pill { font-size:11px; padding:2px 8px; border-radius:10px; background:#21262d;
+            border:1px solid var(--border); color:var(--muted); }
+    .pill.on { color:#3fb950; border-color:#2ea043; }
+    .pill.off { color:#f85149; border-color:#da3633; }
+    .nav { margin-left:auto; font-size:13px; color:var(--accent); text-decoration:none;
+           background:#21262d; border:1px solid var(--border); padding:7px 12px; border-radius:8px; }
+    .nav:hover { filter:brightness(1.2); }
+    main { flex: 1; display: flex; gap: 14px; padding: 14px; overflow: hidden; }
+
+    .left { flex: 1; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+    .stage {
+      flex: 1; background:#000; border:1px solid var(--border); border-radius: 10px;
+      overflow: hidden; display:flex; align-items:center; justify-content:center; min-height:0;
+    }
+    .stage img { width: 100%; height: 100%; object-fit: contain; }
+
+    .bottom-row { display: flex; gap: 14px; height: 240px; }
+    .card {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px;
+    }
+    .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em;
+               color: var(--muted); margin: 0 0 8px; }
+    .minimap { width: 200px; display:flex; flex-direction:column; }
+    #court { width: 100%; height: 210px; background:#0b0f14; border-radius:6px; }
+    .gstats { flex: 1; }
+    .stat { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
+    .stat .k { color: var(--muted); }
+    .stat .v { font-variant-numeric: tabular-nums; }
+    .big { font-size: 22px; font-weight: 700; }
+
+    .right { width: 340px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+    .players { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .pcard { background: var(--panel); border:1px solid var(--border); border-radius:10px; padding:10px;
+             border-left: 4px solid #30363d; }
+    .pcard .pname { font-size: 12px; font-weight: 600; display:flex; align-items:center; gap:6px; }
+    .pcard .swatch { width:10px; height:10px; border-radius:50%; display:inline-block; }
+    .pcard .pshots { font-size: 26px; font-weight: 700; line-height: 1.1; margin: 2px 0; }
+    .pcard .plabel { font-size: 10px; color: var(--muted); text-transform: uppercase; }
+    .pcard .pmeta { font-size: 11px; color: var(--muted); margin-top: 4px; line-height:1.5; }
+    .pcard.dim { opacity: .45; }
+
+    button {
+      background: var(--accent); color:#fff; border:0; border-radius:8px; padding:8px 11px;
+      font-size:13px; cursor:pointer; width:100%; margin-top:8px;
+    }
+    button.secondary { background:#21262d; border:1px solid var(--border); color: var(--text); }
+    button:hover { filter: brightness(1.12); }
+    input { width:100%; background:#0d1117; border:1px solid var(--border); color:var(--text);
+            border-radius:8px; padding:8px; font-size:13px; margin-top:8px; }
+    .note { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+
+    /* calibration modal */
+    .overlay { position: fixed; inset:0; background: rgba(0,0,0,.75); display:none;
+               align-items:center; justify-content:center; z-index:50; }
+    .overlay.show { display:flex; }
+    .modal { background: var(--panel); border:1px solid var(--border); border-radius:12px;
+             padding:18px; max-width: 920px; width: 92%; }
+    .modal h3 { margin: 0 0 6px; font-size:16px; }
+    .modal p { font-size:12px; color: var(--muted); margin: 0 0 10px; }
+    .modal .canvas-wrap { position: relative; background:#000; border-radius:8px; overflow:hidden;
+                          display:flex; justify-content:center; }
+    #calImg { display:block; max-height: 62vh; width: auto; cursor: crosshair; }
+    .cal-actions { display:flex; gap:8px; margin-top:12px; }
+    .cal-actions button { margin-top:0; width:auto; flex: 0 0 auto; }
+    .cal-dot { position:absolute; width:14px; height:14px; border-radius:50%;
+               border:2px solid #fff; transform: translate(-50%,-50%); pointer-events:none; }
+    .cal-label { position:absolute; color:#fff; font-size:10px; font-weight:700;
+                 transform: translate(8px,-14px); pointer-events:none; text-shadow:0 0 3px #000; }
+    @media (max-width:768px) {
+      main { flex-direction:column; overflow:auto; }
+      .left { flex:none; }
+      .right { width:100%; overflow:visible; }
+      .bottom-row { flex-direction:column; height:auto; }
+      .minimap { width:100%; }
+      #court { height:180px; }
+      .stage { min-height:200px; }
+    }
+  </style>
+</head>
+<body>
+  {% include '_nav.html' %}
+  <header>
+    <h1>Padel Analytics</h1>
+    <span class="badge">model: <span id="model">loading…</span></span>
+    <span class="pill" id="calPill">court: unknown</span>
+    <span class="pill" id="reidPill">IDs: raw</span>
+    <span class="pill off" id="matchPill">match: warmup</span>
+    <span class="badge" id="src">…</span>
+    <button id="startMatchBtn" onclick="startMatch()">Start Match</button>
+  </header>
+
+  <main>
+    <div class="left">
+      <div class="stage">
+        <img id="feed" src="/video_feed" alt="live analysis stream" />
+      </div>
+      <div class="bottom-row">
+        <div class="card minimap">
+          <h2>Court Map (2D)</h2>
+          <canvas id="court" width="200" height="420"></canvas>
+        </div>
+        <div class="card gstats">
+          <h2>Live</h2>
+          <div class="stat"><span class="k">FPS</span><span class="v" id="fps">–</span></div>
+          <div class="stat"><span class="k">Players tracked</span><span class="v big" id="players">–</span></div>
+          <div class="stat"><span class="k">Calibration</span><span class="v" id="calStatus">–</span></div>
+          <p class="note">The 2D map needs a one-time court calibration: click
+          <b>Calibrate court</b> and mark the 4 court corners (far-left, far-right,
+          near-right, near-left). It is saved per video source.</p>
+        </div>
+      </div>
+    </div>
+
+    <aside class="right">
+      <div class="card">
+        <h2>Players</h2>
+        <div class="players" id="playersGrid"></div>
+      </div>
+
+      <div class="card" id="matchCard" style="display:none">
+        <h2>Match <span class="badge" id="ralliesBadge" style="margin-left:6px"></span></h2>
+        <div style="display:flex;justify-content:space-around;align-items:center;margin:6px 0">
+          <div style="text-align:center"><div class="k">Team A</div><div class="v big" id="scoreA">0</div></div>
+          <div style="font-size:18px;color:var(--muted)">vs</div>
+          <div style="text-align:center"><div class="k">Team B</div><div class="v big" id="scoreB">0</div></div>
+        </div>
+        <div class="players" id="teamsGrid"></div>
+      </div>
+
+      <div class="card" id="shotCard" style="display:none">
+        <h2>Shot log</h2>
+        <ul id="shotLog" style="list-style:none;padding:0;margin:0;max-height:200px;overflow:auto;font-size:12px"></ul>
+      </div>
+
+      <div class="card" id="heatCard" style="display:none">
+        <h2>Position heatmaps</h2>
+        <div id="heatGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
+      </div>
+
+      <div class="card">
+        <h2>Controls</h2>
+        <button onclick="fetch('/api/pause',{method:'POST'})">Pause / Resume</button>
+        <button class="secondary" onclick="fetch('/api/restart',{method:'POST'})">Restart video</button>
+        <button class="secondary" onclick="fetch('/api/reload',{method:'POST'}).then(r=>r.json()).then(d=>alert('model: '+d.model))">Reload latest model</button>
+        <button class="secondary" id="reidBtn" onclick="triggerReid()">Lock player IDs (ReID)</button>
+        <button class="secondary" onclick="openCalibrator()">Calibrate court</button>
+      </div>
+
+      <div class="card">
+        <h2>Switch source</h2>
+        <input id="url" placeholder="YouTube URL or local file path" />
+        <button onclick="setSource()">Analyze</button>
+        <p class="note">Default source: {{ yt }}.</p>
+      </div>
+    </aside>
+  </main>
+
+  <!-- calibration modal -->
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <h3>Calibrate court corners</h3>
+      <p>Click the 4 corners of the <b>playing court</b> in this exact order:
+         <b>1) far-left &nbsp; 2) far-right &nbsp; 3) near-right &nbsp; 4) near-left</b>.
+         These map to the 4 reference corners of a 10m × 20m padel court.</p>
+      <div class="canvas-wrap" id="calWrap">
+        <img id="calImg" src="" alt="calibration frame" />
+      </div>
+      <div class="cal-actions">
+        <button class="secondary" onclick="resetCalPoints()">Reset points</button>
+        <button id="saveCal" onclick="saveCalibration()" disabled>Save calibration</button>
+        <button class="secondary" onclick="closeCalibrator()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SLOT_COLORS = {1:'#3fb950',2:'#a371f7',3:'#f778ba',4:'#79c0ff'};
+    const COURT_W = 10.0, COURT_H = 20.0;
+
+    // ---- stats polling ----------------------------------------------------
+    async function poll() {
+      try {
+        const s = await (await fetch('/stats')).json();
+        document.getElementById('fps').textContent = s.fps ?? '–';
+        document.getElementById('players').textContent = s.players ?? '–';
+        document.getElementById('model').textContent = s.model || '';
+        document.getElementById('src').textContent = s.source || '';
+        const cal = !!s.calibrated;
+        document.getElementById('calStatus').textContent = cal ? 'set' : 'not set';
+        const pill = document.getElementById('calPill');
+        pill.textContent = 'court: ' + (cal ? 'calibrated' : 'uncalibrated');
+        pill.className = 'pill ' + (cal ? 'on' : 'off');
+        renderReid(s.reid);
+        renderMatch(s.match, s.online_reid);
+        renderScore(s.match, s.score, s.rallies);
+        renderTeams(s.player_stats || []);
+        renderShotLog(s.shot_log || []);
+        renderHeatGrid(s.positions_slots || []);
+        renderPlayers(s.player_stats || []);
+        drawCourt(s.player_stats || []);
+      } catch (e) {}
+    }
+    setInterval(poll, 700); poll();
+    setInterval(()=>{ const slots=(window._heatSlots||[]); slots.forEach(s=>{const im=document.getElementById('heat_'+s); if(im) im.src='/api/heatmap/'+s+'?t='+Date.now();}); }, 5000);
+
+    async function startMatch() {
+      const r = await (await fetch('/api/match/start', { method: 'POST' })).json();
+      if (!r.ok) { alert(r.reason || 'could not start match'); return; }
+      if (r.reset_previous) alert('Match started. Prior warmup/auto stats discarded.');
+      poll();
+    }
+    function renderMatch(match, reid) {
+      const pill = document.getElementById('matchPill');
+      const btn = document.getElementById('startMatchBtn');
+      if (!match) { pill.style.display = 'none'; btn.style.display = 'none'; return; }
+      pill.style.display = ''; btn.style.display = '';
+      const st = match.state;
+      pill.textContent = 'match: ' + st;
+      pill.className = 'pill ' + (st === 'live' ? 'on' : 'off');
+      // during warmup, show Re-ID lock progress; once live, hide the button
+      let suffix = '';
+      if (st === 'warmup' && reid) suffix = ` · ${reid.mapped}/${reid.tracklets} IDs`;
+      if (st === 'warmup' && reid && reid.locked) suffix += ' (locked)';
+      pill.textContent += suffix;
+      btn.disabled = (st === 'ended');
+      btn.textContent = st === 'live' ? 'Restart Match' : 'Start Match';
+    }
+    function renderScore(match, score, rallies) {
+      const card = document.getElementById('matchCard');
+      if (!match) { card.style.display = 'none'; return; }
+      card.style.display = '';
+      document.getElementById('scoreA').textContent = (score && score[0]!=null) ? score[0] : 0;
+      document.getElementById('scoreB').textContent = (score && score[1]!=null) ? score[1] : 0;
+      document.getElementById('ralliesBadge').textContent = (rallies!=null ? rallies : 0) + ' rallies';
+    }
+    function renderTeams(players) {
+      const grid = document.getElementById('teamsGrid');
+      // aggregate shots by team (team 0 = A, team 1 = B)
+      const agg = {0:{shots:0,n:0},1:{shots:0,n:0}};
+      players.forEach(p => { const t = (p.team==null?-1:p.team); if(t in agg){agg[t].shots+=p.shots||0; agg[t].n+=1;} });
+      grid.innerHTML = ['A','B'].map((lbl,i)=>`<div class="pstat"><span class="k">Team ${lbl}</span>
+        <span>${agg[i].n} players · ${agg[i].shots} shots</span></div>`).join('');
+    }
+    function renderShotLog(log) {
+      const card = document.getElementById('shotCard');
+      const ul = document.getElementById('shotLog');
+      if (!log || !log.length) { card.style.display = 'none'; ul.innerHTML=''; return; }
+      card.style.display = '';
+      const teamLbl = t => (t==null?'':(t===0?'A':'B'));
+      ul.innerHTML = log.slice(-20).reverse().map(s =>
+        `<li style="padding:3px 0;border-bottom:1px solid #21262d">
+          <b style="color:var(--accent)">P${s.slot}</b>${s.team!=null?` <span class="badge">Team ${teamLbl(s.team)}</span>`:''}
+          — ${s.type} <span class="badge" style="float:right">f${s.frame}</span></li>`).join('');
+    }
+    function renderHeatGrid(slots) {
+      window._heatSlots = slots;
+      const card = document.getElementById('heatCard');
+      const grid = document.getElementById('heatGrid');
+      if (!slots || !slots.length) { card.style.display = 'none'; grid.innerHTML=''; return; }
+      card.style.display = '';
+      grid.innerHTML = slots.map(s =>
+        `<div style="text-align:center"><img id="heat_${s}" src="/api/heatmap/${s}?t=${Date.now()}"
+           alt="P${s} heat" style="width:100%;border-radius:6px;border:1px solid var(--border)" />
+           <div class="k" style="font-size:10px;margin-top:2px">P${s}</div></div>`).join('');
+    }
+
+    function renderReid(reid) {
+      const pill = document.getElementById('reidPill');
+      const btn = document.getElementById('reidBtn');
+      if (!reid) { return; }
+      const st = reid.status;
+      const map = {
+        'idle':    { t: 'IDs: raw',        cls: 'off',  btn: 'Lock player IDs (ReID)',  dis: false },
+        'computing':{ t: 'IDs: computing…', cls: '',    btn: 'Computing…',              dis: true  },
+        'ready':   { t: 'IDs: stable',     cls: 'on',  btn: 'Re-run ReID',              dis: false },
+        'error':   { t: 'IDs: error',      cls: 'off', btn: 'Retry ReID',               dis: false },
+      }[st] || { t: 'IDs: '+st, cls: 'off', btn: 'Lock player IDs (ReID)', dis: false };
+      pill.textContent = map.t;
+      pill.className = 'pill ' + map.cls;
+      btn.textContent = map.btn;
+      btn.disabled = map.dis;
+    }
+
+    function triggerReid() {
+      fetch('/api/reid', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => { if (!d.ok && d.reason) alert(d.reason); poll(); });
+    }
+
+    function renderPlayers(players) {
+      const grid = document.getElementById('playersGrid');
+      const bySlot = {};
+      players.forEach(p => bySlot[p.slot] = p);
+      let html = '';
+      for (let slot = 1; slot <= 4; slot++) {
+        const p = bySlot[slot];
+        const color = (p && p.color) || SLOT_COLORS[slot];
+        const active = p && p.active;
+        const shots = p ? p.shots : 0;
+        const dist = p ? p.distance_m.toFixed(1) : '0.0';
+        const time = p ? p.time_on_court.toFixed(0) : '0';
+        html += `<div class="pcard ${active?'':'dim'}" style="border-left-color:${color}">
+          <div class="pname"><span class="swatch" style="background:${color}"></span>Player ${slot}</div>
+          <div class="pshots">${shots}</div>
+          <div class="plabel">shots</div>
+          <div class="pmeta">${dist} m moved<br>${time}s on court</div>
+        </div>`;
+      }
+      grid.innerHTML = html;
+    }
+
+    // ---- 2D court minimap -------------------------------------------------
+    function drawCourt(players) {
+      const cv = document.getElementById('court');
+      const ctx = cv.getContext('2d');
+      const W = cv.width, H = cv.height;
+      ctx.clearRect(0, 0, W, H);
+      const pad = 8;
+      const cw = W - pad*2, ch = H - pad*2;
+      // background
+      ctx.fillStyle = '#0e3d2e'; ctx.fillRect(pad, pad, cw, ch);
+      // map meters -> px (x: 0..COURT_W -> cw, y: 0..COURT_H -> ch)
+      const mx = m => pad + (m / COURT_W) * cw;
+      const my = m => pad + (m / COURT_H) * ch;
+      // net (midline)
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(pad, my(COURT_H/2)); ctx.lineTo(W-pad, my(COURT_H/2)); ctx.stroke();
+      // service lines
+      ctx.strokeStyle = '#9ad'; ctx.lineWidth = 1;
+      [6.95, 13.05].forEach(y => {
+        ctx.beginPath(); ctx.moveTo(pad, my(y)); ctx.lineTo(W-pad, my(y)); ctx.stroke();
+      });
+      // center service line
+      ctx.beginPath(); ctx.moveTo(mx(COURT_W/2), my(6.95)); ctx.lineTo(mx(COURT_W/2), my(13.05)); ctx.stroke();
+      // border
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+      ctx.strokeRect(pad, pad, cw, ch);
+
+      // players
+      players.forEach(p => {
+        if (!p.court_xy || p.court_xy.length < 2) return;
+        const x = mx(Math.max(0, Math.min(COURT_W, p.court_xy[0])));
+        const y = my(Math.max(0, Math.min(COURT_H, p.court_xy[1])));
+        ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI*2);
+        ctx.fillStyle = p.color || SLOT_COLORS[p.slot]; ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('P'+p.slot, x, y-10);
+      });
+    }
+
+    // ---- source switching -------------------------------------------------
+    function setSource() {
+      const url = document.getElementById('url').value.trim();
+      if (!url) return;
+      // Local files -> use 6-model GPU pipeline
+      if (!url.includes('youtube.com') && !url.includes('youtu.be') && !url.includes('http')) {
+        const video = url.startsWith('/') ? url : '/mnt/pi-recordings/' + url;
+        fetch('/api/gpu/start', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ video, skip: 5 })
+        }).then(r => r.json()).then(d => {
+          if (d.ok) document.getElementById('feed').src = '/gpu_feed?t='+Date.now();
+          else alert('GPU analysis error: ' + (d.error || 'unknown'));
+        });
+      } else {
+        // YouTube URLs -> use PadelAnalyzer pipeline
+        fetch('/api/source', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ url })
+        }).then(() => { document.getElementById('feed').src = '/video_feed?t='+Date.now(); });
+      }
+    }
+
+    // ---- calibration modal ------------------------------------------------
+    let calPoints = [];
+    const overlay = document.getElementById('overlay');
+    const calImg = document.getElementById('calImg');
+    const calWrap = document.getElementById('calWrap');
+
+    function openCalibrator() {
+      calPoints = [];
+      overlay.classList.add('show');
+      calImg.src = '/api/calibration/frame?t=' + Date.now();
+      calImg.onload = redrawCalDots;
+      document.getElementById('saveCal').disabled = true;
+    }
+    function closeCalibrator() { overlay.classList.remove('show'); }
+    function resetCalPoints() { calPoints = []; redrawCalDots(); document.getElementById('saveCal').disabled = true; }
+
+    calImg.addEventListener('click', (e) => {
+      if (calPoints.length >= 4) return;
+      const rect = calImg.getBoundingClientRect();
+      // scale click -> natural image pixels
+      const sx = calImg.naturalWidth / rect.width;
+      const sy = calImg.naturalHeight / rect.height;
+      const x = (e.clientX - rect.left) * sx;
+      const y = (e.clientY - rect.top) * sy;
+      calPoints.push([x, y]);
+      redrawCalDots();
+      if (calPoints.length === 4) document.getElementById('saveCal').disabled = false;
+    });
+
+    function redrawCalDots() {
+      // clear old dots
+      calWrap.querySelectorAll('.cal-dot,.cal-label').forEach(el => el.remove());
+      const rect = calImg.getBoundingClientRect();
+      if (!rect.width) return;
+      const sx = rect.width / calImg.naturalWidth;
+      const sy = rect.height / calImg.naturalHeight;
+      const wrapRect = calWrap.getBoundingClientRect();
+      const imgRect = calImg.getBoundingClientRect();
+      const offX = imgRect.left - wrapRect.left;
+      const offY = imgRect.top - wrapRect.top;
+      calPoints.forEach((p, i) => {
+        const dot = document.createElement('div');
+        dot.className = 'cal-dot';
+        dot.style.background = ['#3fb950','#a371f7','#f778ba','#79c0ff'][i];
+        dot.style.left = (offX + p[0]*sx) + 'px';
+        dot.style.top = (offY + p[1]*sy) + 'px';
+        calWrap.appendChild(dot);
+        const lbl = document.createElement('div');
+        lbl.className = 'cal-label';
+        lbl.textContent = (i+1);
+        lbl.style.left = (offX + p[0]*sx) + 'px';
+        lbl.style.top = (offY + p[1]*sy) + 'px';
+        calWrap.appendChild(lbl);
+      });
+    }
+
+    function saveCalibration() {
+      if (calPoints.length !== 4) return;
+      const body = {
+        corners: calPoints,
+        frame_width: calImg.naturalWidth,
+        frame_height: calImg.naturalHeight,
+      };
+      fetch('/api/calibrate', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      }).then(r => r.json()).then(d => {
+        if (d.ok) { closeCalibrator(); poll(); }
+        else alert('Calibration failed: ' + (d.error || 'unknown'));
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ brand.name }} — Reports</title>
+  <style>
+    :root { --bg:#0d1117; --panel:#161b22; --accent:{{ brand.accent }}; --good:#3fb950;
+            --text:#c9d1d9; --muted:#8b949e; --border:#30363d; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;
+           background:var(--bg); color:var(--text); }
+    header { padding:12px 20px; background:var(--panel); border-bottom:1px solid var(--border);
+             display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+    header h1 { font-size:18px; margin:0; }
+    .badge { font-size:12px; color:var(--muted); }
+    .wrap { max-width:1100px; margin:0 auto; padding:18px; }
+
+    .actions { margin-left:auto; display:flex; gap:8px; }
+    button { background:var(--accent); color:#fff; border:0; border-radius:8px;
+             padding:9px 16px; font-size:13px; cursor:pointer; font-weight:600; }
+    button:hover { filter:brightness(1.12); }
+    button.sec { background:#21262d; border:1px solid var(--border); color:var(--text); }
+
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
+    .rcard { background:var(--panel); border:1px solid var(--border); border-radius:12px;
+             padding:16px; cursor:pointer; transition:border-color .15s, transform .1s;
+             text-decoration:none; color:var(--text); display:block; }
+    .rcard:hover { border-color:var(--accent); transform:translateY(-2px); }
+    .rcard .top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
+    .rcard .date { font-size:14px; font-weight:700; }
+    .rcard .time { font-size:12px; color:var(--muted); }
+    .rcard .state { font-size:10px; padding:2px 8px; border-radius:10px; background:#21262d;
+                    border:1px solid var(--border); text-transform:uppercase; }
+    .rcard .state.live { color:var(--good); border-color:#2ea043; }
+    .rcard .score-row { display:flex; align-items:center; justify-content:center; gap:16px;
+                        padding:12px 0; }
+    .rcard .score-row .tm { text-align:center; }
+    .rcard .score-row .tm .lbl { font-size:10px; color:var(--muted); text-transform:uppercase; }
+    .rcard .score-row .tm .val { font-size:36px; font-weight:800; font-variant-numeric:tabular-nums; }
+    .rcard .score-row .dash { font-size:18px; color:var(--muted); }
+    .rcard .stats { display:flex; gap:16px; font-size:12px; color:var(--muted);
+                    border-top:1px solid var(--border); padding-top:10px; }
+    .rcard .stats span b { color:var(--text); }
+    .rcard .del-btn { position:absolute; top:8px; right:8px; background:rgba(13,17,23,.8);
+                      border:1px solid var(--border); border-radius:6px; padding:4px 7px;
+                      cursor:pointer; color:#f85149; font-size:12px;
+                      backdrop-filter:blur(4px); z-index:5; display:flex; align-items:center; gap:4px; }
+    .rcard:hover .del-btn, .rcard .del-btn:focus { background:rgba(248,81,73,.2); }
+    .rcard .del-btn:hover { background:#f85149; color:#fff; border-color:#f85149; }
+    @media (max-width:768px) {
+      .wrap { padding:12px; }
+      .grid { grid-template-columns:1fr; }
+      .header { padding:10px 12px 10px 52px; }
+      .rcard .score-row .tm .val { font-size:28px; }
+      .actions button { padding:7px 12px; font-size:12px; }
+    }
+
+    .empty { text-align:center; padding:60px 20px; color:var(--muted); }
+    .empty svg { width:48px; height:48px; opacity:.4; margin-bottom:12px; }
+    .empty p { font-size:14px; line-height:1.6; }
+  </style>
+</head>
+<body>
+  {% include '_nav.html' %}
+  <header>
+    <h1>Match Reports</h1>
+    <span class="badge" id="countBadge"></span>
+    <div class="actions">
+      <button onclick="saveCurrent()" title="Generate a report from the current live session">
+        Save Current Match
+      </button>
+      <button class="sec" onclick="load()">Refresh</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div id="empty" class="empty" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+      <p>No saved reports yet.<br/>Start a match on the <a href="/" style="color:var(--accent)">Live</a> page, then click <b>Save Current Match</b>.</p>
+    </div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <script>
+    async function load() {
+      try {
+        const reports = await (await fetch('/api/reports')).json();
+        render(reports);
+      } catch (e) {
+        document.getElementById('empty').style.display = '';
+        document.getElementById('grid').innerHTML = '';
+      }
+    }
+
+    function fmtDate(iso) {
+      if (!iso) return { date: '—', time: '' };
+      const d = new Date(iso);
+      return {
+        date: d.toLocaleDateString([], { weekday:'short', month:'short', day:'numeric', year:'numeric' }),
+        time: d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }),
+      };
+    }
+
+    function fmtDur(sec) {
+      sec = Math.round(sec || 0);
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      if (m) return `${m}m ${s}s`;
+      return `${s}s`;
+    }
+
+    function render(reports) {
+      const grid = document.getElementById('grid');
+      const empty = document.getElementById('empty');
+      const badge = document.getElementById('countBadge');
+      badge.textContent = reports.length + ' report' + (reports.length !== 1 ? 's' : '');
+      if (!reports.length) {
+        empty.style.display = '';
+        grid.innerHTML = '';
+        return;
+      }
+      empty.style.display = 'none';
+      grid.innerHTML = reports.map(r => {
+        const dt = fmtDate(r.generated_at);
+        const sa = (r.score && r.score[0] != null) ? r.score[0] : 0;
+        const sb = (r.score && r.score[1] != null) ? r.score[1] : 0;
+        const state = r.match_state || '';
+        return `<div class="rcard" style="position:relative">
+          <button class="del-btn" onclick="delReport(event,'${r.match_id}')" title="Delete report">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+          <a href="/report/${r.match_id}" style="text-decoration:none;color:inherit;display:block">
+          <div class="top">
+            <div><div class="date">${dt.date}</div><div class="time">${dt.time}</div></div>
+            ${state ? `<span class="state ${state==='live'?'live':''}">${state}</span>` : ''}
+          </div>
+          <div class="score-row">
+            <div class="tm"><div class="lbl">Team A</div><div class="val">${sa}</div></div>
+            <span class="dash">—</span>
+            <div class="tm"><div class="lbl">Team B</div><div class="val">${sb}</div></div>
+          </div>
+          <div class="stats">
+            <span><b>${r.total_shots || 0}</b> shots</span>
+            <span><b>${r.rallies || 0}</b> rallies</span>
+            <span><b>${fmtDur(r.duration_sec)}</b> played</span>
+          </div>
+          </a>
+        </div>`;
+      }).join('');
+    }
+
+    async function saveCurrent() {
+      const btn = event.target;
+      btn.textContent = 'Saving…'; btn.disabled = true;
+      try {
+        const r = await (await fetch('/api/match/report', { method: 'POST' })).json();
+        if (r.ok) {
+          load();
+        } else {
+          alert('Could not generate report — is a match running?');
+        }
+      } catch (e) {
+        alert('Error saving report: ' + e.message);
+      }
+      btn.textContent = 'Save Current Match'; btn.disabled = false;
+    }
+
+    async function delReport(ev, matchId) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (!confirm('Delete this report permanently?')) return;
+      try {
+        const r = await (await fetch('/api/reports/' + matchId, { method: 'DELETE' })).json();
+        if (r.ok) load();
+        else alert('Could not delete: ' + (r.error || 'unknown'));
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{
+  // Point VS Code at the project venv automatically
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.terminal.activateEnvironment": true,
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.autoImportCompletions": true,
+
+  // Format on save with Ruff/Black if installed
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.venv": true
+  },
+  "yaml.schemas": {
+    // nothing custom; Ultralytics data.yaml is free-form
+  },
+  "search.exclude": {
+    "**/data": true,
+    "**/runs": true,
+    "**/.venv": true
+  }
+}

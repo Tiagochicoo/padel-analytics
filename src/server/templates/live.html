@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ brand.name }} — Live</title>
+  <style>
+    :root { --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --accent:{{ brand.accent }}; 
+            --accent2:{{ brand.accent2 }}; --text:#c9d1d9; --muted:#8b949e; --border:#30363d; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;
+           background:var(--bg); color:var(--text); display:flex; flex-direction:column; height:100vh; }
+    header { padding:12px 20px; background:var(--panel); border-bottom:1px solid var(--border);
+             display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+    .brand { flex:1; display:flex; align-items:center; gap:12px; }
+    .brand h1 { font-size:18px; margin:0; }
+    .brand .tagline { font-size:12px; color:var(--muted); }
+    .badge { font-size:11px; padding:2px 8px; border-radius:10px; background:#21262d;
+            border:1px solid var(--border); color:var(--muted); }
+    .badge.on { color:#3fb950; border-color:#2ea043; }
+    .badge.off { color:#f85149; border-color:#da3633; }
+    .nav { font-size:13px; color:var(--text); text-decoration:none;
+           background:#21262d; border:1px solid var(--border); padding:7px 12px; border-radius:8px; }
+    .nav:hover { filter:brightness(1.2); }
+    
+    main { flex:1; display:grid; grid-template-columns:1fr 340px; gap:14px; padding:14px; overflow:hidden; }
+    
+    .stage { background:#000; border:1px solid var(--border); border-radius:10px; overflow:hidden;
+             display:flex; flex-direction:column; min-height:0; position:relative; }
+    .stage .video { flex:1; display:flex; align-items:center; justify-content:center; min-height:0; }
+    .stage .video img { width:100%; height:100%; object-fit:contain; }
+    
+    .hud { padding:10px 14px; background:linear-gradient(to right, rgba(13,17,23,0.95), rgba(13,17,23,0.85));
+            border-top:1px solid var(--border); display:flex; align-items:center; gap:20px; }
+    .hud .score { display:flex; align-items:center; gap:12px; }
+    .hud .score .team { display:flex; align-items:baseline; gap:6px; }
+    .hud .score .team .label { font-size:11px; color:var(--muted); text-transform:uppercase; }
+    .hud .score .team .value { font-size:32px; font-weight:800; font-variant-numeric:tabular-nums; }
+    .hud .score .sep { font-size:14px; color:var(--muted); }
+    .hud .status { flex:1; display:flex; align-items:center; gap:10px; }
+    .hud .status .state { font-size:12px; padding:3px 10px; border-radius:12px; background:#21262d;
+                           border:1px solid var(--border); }
+    .hud .status .state.live { background:rgba(63,185,80,0.15); color:#3fb950; border-color:#2ea043; }
+    .hud .status .rallies { font-size:12px; color:var(--muted); }
+    .hud .controls { display:flex; gap:8px; }
+    .hud .controls button { background:var(--accent); color:#fff; border:0; border-radius:8px;
+                            padding:8px 14px; font-size:13px; cursor:pointer; font-weight:600; }
+    .hud .controls button:hover { filter:brightness(1.1); }
+    .hud .controls button.end { background:#f85149; }
+    
+    .sidebar { display:flex; flex-direction:column; gap:12px; overflow-y:auto; }
+    .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:12px; }
+    .card h2 { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:0 0 10px; }
+    
+    .players { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .pcard { background:#0d1117; border:1px solid var(--border); border-radius:8px; padding:10px;
+             border-left:3px solid #30363d; }
+    .pcard .hd { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+    .pcard .hd .nm { font-size:12px; font-weight:600; display:flex; align-items:center; gap:6px; }
+    .pcard .hd .swatch { width:8px; height:8px; border-radius:50%; display:inline-block; }
+    .pcard .hd .team { font-size:9px; padding:2px 6px; border-radius:8px; background:#21262d; border:1px solid var(--border); }
+    .pcard .row { display:flex; justify-content:space-between; font-size:12px; padding:2px 0; }
+    .pcard .row .k { color:var(--muted); }
+    .pcard .shot { font-size:24px; font-weight:700; color:var(--accent); margin:4px 0; }
+    .pcard .heat { margin-top:8px; }
+    .pcard .heat img { width:100%; border-radius:4px; border:1px solid var(--border); background:#010409; }
+    .pcard.dim { opacity:.4; }
+    
+    .log { max-height:200px; overflow:auto; font-size:11px; }
+    .log ul { list-style:none; padding:0; margin:0; }
+    .log li { padding:4px 0; border-bottom:1px solid #21262d; display:flex; align-items:center; gap:6px; }
+    .log li .player { font-weight:600; color:var(--accent); }
+    .log li .shot { flex:1; }
+    .log li .team { font-size:10px; padding:1px 6px; border-radius:6px; background:#21262d; border:1px solid var(--border); }
+    .log li .frame { font-size:10px; color:var(--muted); }
+    
+    .heat-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .heat-grid .item { text-align:center; }
+    .heat-grid .item img { width:100%; border-radius:6px; border:1px solid var(--border); background:#010409; }
+    .heat-grid .item .label { font-size:10px; color:var(--muted); margin-top:4px; }
+    
+    .cal-note { font-size:11px; color:var(--muted); line-height:1.5; padding:8px; background:#0d1117;
+                border-radius:6px; border:1px solid var(--border); }
+    
+    @media (max-width:900px) {
+      main { grid-template-columns:1fr; grid-template-rows:1fr auto; }
+      .sidebar { max-height:none; overflow-y:auto; }
+      .hud { flex-wrap:wrap; gap:10px; }
+      .hud .score .team .value { font-size:24px; }
+      .hud .controls button { padding:6px 10px; font-size:12px; }
+      .stage { min-height:200px; }
+    }
+    @media (max-width:480px) {
+      .hud .score { gap:8px; }
+      .hud .score .team .value { font-size:20px; }
+      .players { grid-template-columns:1fr 1fr; }
+      .pcard { padding:8px; }
+      .pcard .shot { font-size:20px; }
+      .cam-btn span { display:none; }
+    }
+    .cam-btn { position:absolute; top:12px; right:12px; background:rgba(22,27,34,.85);
+               border:1px solid var(--border); color:var(--text); border-radius:8px;
+               padding:7px 12px; font-size:12px; cursor:pointer; display:flex; align-items:center;
+               gap:6px; backdrop-filter:blur(6px); z-index:5; }
+    .cam-btn:hover { filter:brightness(1.2); }
+    .cam-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .src-bar { display:flex; gap:6px; align-items:center; }
+    .src-bar input { background:#0d1117; border:1px solid var(--border); color:var(--text);
+                     border-radius:6px; padding:6px 10px; font-size:12px; width:260px; }
+    .src-bar button { background:var(--accent); color:#fff; border:0; border-radius:6px;
+                      padding:6px 12px; font-size:12px; cursor:pointer; white-space:nowrap; }
+    .src-bar button:hover { filter:brightness(1.1); }
+    .src-bar .hint { font-size:10px; color:var(--muted); }
+  </style>
+</head>
+<body>
+  {% include '_nav.html' %}
+  <header>
+    <div class="brand">
+      <h1>{{ brand.name }}</h1>
+      <span class="tagline">{{ brand.tagline }}</span>
+    </div>
+    <span class="badge" id="fpsBadge">– fps</span>
+    <span class="badge" id="calBadge">court: unknown</span>
+    <span class="badge" id="reidBadge">IDs: warmup</span>
+  </header>
+  
+  <main>
+    <div class="stage">
+      <div class="video">
+        <img id="feed" src="/video_feed" alt="live stream" />
+        <video id="webcam" autoplay playsinline muted style="display:none;width:100%;height:100%;object-fit:contain"></video>
+      </div>
+      <button id="camToggle" class="cam-btn" onclick="toggleCam()" title="Switch to local camera">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        <span>My Camera</span>
+      </button>
+      </div>
+      <div class="src-bar">
+        <input id="srcInput" placeholder="Filename (e.g. highlights_day6_women.mp4)" />
+        <button onclick="analyzeVideo()">&#9654; Analyze</button>
+        <span class="hint">runs 6-model GPU pipeline</span>
+      </div>
+      <div class="hud">
+        <div class="score">
+          <div class="team">
+            <span class="label">Team A</span>
+            <span class="value" id="scoreA">0</span>
+          </div>
+          <span class="sep">—</span>
+          <div class="team">
+            <span class="label">Team B</span>
+            <span class="value" id="scoreB">0</span>
+          </div>
+        </div>
+        <div class="status">
+          <span class="state" id="matchState">warmup</span>
+          <span class="rallies" id="ralliesBadge">0 rallies</span>
+        </div>
+        <div class="controls">
+          <button id="startBtn" onclick="toggleMatch()">Start Match</button>
+        </div>
+      </div>
+    </div>
+    
+    <aside class="sidebar">
+      <div class="card">
+        <h2>Players</h2>
+        <div class="players" id="playersGrid"></div>
+      </div>
+      
+      <div class="card log">
+        <h2>Shot log</h2>
+        <ul id="shotLog"></ul>
+      </div>
+      
+      <div class="card" id="heatCard" style="display:none">
+        <h2>Heatmaps</h2>
+        <div class="heat-grid" id="heatGrid"></div>
+      </div>
+      
+      <div class="cal-note" id="calNote" style="display:none">
+        <b>Court calibration needed</b>. Go to <a href="/admin" style="color:var(--accent)">Admin</a> and calibrate the court corners for accurate player positioning.
+      </div>
+    </aside>
+  </main>
+  
+  <script>
+    const SLOT_COLORS = {1:'#3fb950',2:'#a371f7',3:'#f778ba',4:'#79c0ff'};
+    
+    async function poll() {
+      try {
+        const s = await (await fetch('/stats')).json();
+        document.getElementById('fpsBadge').textContent = (s.fps ?? '–') + ' fps';
+        renderCal(s.calibrated);
+        renderReid(s.reid);
+        renderMatch(s.match, s.online_reid);
+        renderScore(s.score, s.rallies);
+        renderPlayers(s.player_stats || []);
+        renderShotLog(s.shot_log || []);
+        renderHeatGrid(s.positions_slots || []);
+      } catch (e) {}
+    }
+    setInterval(poll, 700); poll();
+    setInterval(()=>{ const slots=(window._heatSlots||[]); slots.forEach(s=>{const im=document.getElementById('heat_'+s); if(im) im.src='/api/heatmap/'+s+'?t='+Date.now();}); }, 5000);
+    
+    async function toggleMatch() {
+      const btn = document.getElementById('startBtn');
+      const state = document.getElementById('matchState').textContent;
+      if (state === 'live') {
+        const r = await (await fetch('/api/match/end', { method:'POST' })).json();
+        if (r.ok) poll();
+      } else if (state === 'ended') {
+        const r = await (await fetch('/api/match/reset', { method:'POST' })).json();
+        if (r.ok) poll();
+      } else {
+        const r = await (await fetch('/api/match/start', { method:'POST' })).json();
+        if (!r.ok) { alert(r.reason || 'could not start match'); return; }
+        if (r.reset_previous) alert('Match started. Prior warmup stats discarded.');
+        poll();
+      }
+    }
+    
+    function renderCal(cal) {
+      const badge = document.getElementById('calBadge');
+      const note = document.getElementById('calNote');
+      badge.textContent = 'court: ' + (cal ? 'calibrated' : 'unknown');
+      badge.className = 'badge ' + (cal ? 'on' : 'off');
+      note.style.display = cal ? 'none' : '';
+    }
+    
+    function renderReid(reid) {
+      const badge = document.getElementById('reidBadge');
+      if (!reid) return;
+      const st = reid.status;
+      let txt = 'IDs: warmup';
+      if (st === 'computing') txt = 'IDs: computing…';
+      else if (st === 'ready') txt = 'IDs: locked';
+      else if (st === 'error') txt = 'IDs: error';
+      else if (st === 'idle') txt = 'IDs: raw';
+      if (st === 'warmup' && reid.mapped != null && reid.tracklets != null)
+        txt += ` (${reid.mapped}/${reid.tracklets})`;
+      badge.textContent = txt;
+      badge.className = 'badge ' + (st === 'ready' ? 'on' : 'off');
+    }
+    
+    function renderMatch(match, reid) {
+      const el = document.getElementById('matchState');
+      const btn = document.getElementById('startBtn');
+      if (!match) { el.style.display = 'none'; btn.style.display = 'none'; return; }
+      el.style.display = ''; btn.style.display = '';
+      el.textContent = match.state || 'warmup';
+      el.className = 'state ' + (match.state === 'live' ? 'live' : '');
+      btn.textContent = match.state === 'live' ? 'End Match' : (match.state === 'ended' ? 'New Match' : 'Start Match');
+    }
+    
+    function renderScore(score, rallies) {
+      document.getElementById('scoreA').textContent = (score && score[0]!=null) ? score[0] : 0;
+      document.getElementById('scoreB').textContent = (score && score[1]!=null) ? score[1] : 0;
+      document.getElementById('ralliesBadge').textContent = (rallies != null ? rallies : 0) + ' rallies';
+    }
+    
+    let _lastSlotKey = '';
+    function renderPlayers(players) {
+      const grid = document.getElementById('playersGrid');
+      const bySlot = {};
+      players.forEach(p => bySlot[p.slot] = p);
+      const activeSlots = players.filter(p => p.active).map(p => p.slot).sort();
+      const slotKey = activeSlots.join(',');
+      const slotsChanged = slotKey !== _lastSlotKey;
+      _lastSlotKey = slotKey;
+      if (slotsChanged) {
+        let html = '';
+        for (let slot = 1; slot <= 4; slot++) {
+          const p = bySlot[slot];
+          const color = (p && p.color) || SLOT_COLORS[slot];
+          const active = p && p.active;
+          html += `<div class="pcard ${active?'':'dim'}" id="pcard_${slot}" style="border-left-color:${color}">
+            <div class="hd"><span class="nm"><span class="swatch" style="background:${color}"></span>Player ${slot}</span>
+            <span class="team" id="pteam_${slot}"></span></div>
+            <div class="shot" id="pshots_${slot}">0</div>
+            <div class="row"><span class="k">distance</span><span id="pdist_${slot}">0.0 m</span></div>
+          </div>`;
+        }
+        grid.innerHTML = html;
+      }
+      for (let slot = 1; slot <= 4; slot++) {
+        const p = bySlot[slot];
+        const shotsEl = document.getElementById('pshots_' + slot);
+        const distEl = document.getElementById('pdist_' + slot);
+        const teamEl = document.getElementById('pteam_' + slot);
+        if (!shotsEl) continue;
+        shotsEl.textContent = p ? p.shots : 0;
+        distEl.textContent = p ? p.distance_m.toFixed(1) + ' m' : '0.0 m';
+        const team = p ? p.team : null;
+        teamEl.textContent = team != null ? 'Team ' + (team === 0 ? 'A' : 'B') : '';
+      }
+    }
+    
+    function renderShotLog(log) {
+      const ul = document.getElementById('shotLog');
+      if (!log || !log.length) { ul.innerHTML = ''; return; }
+      const teamLbl = t => t==null?'':(t===0?'A':'B');
+      ul.innerHTML = log.slice(-15).reverse().map(s =>
+        `<li><span class="player">P${s.slot}</span>
+         ${s.team!=null?`<span class="team">Team ${teamLbl(s.team)}</span>`:''}
+         <span class="shot">${s.type}</span>
+         <span class="frame">f${s.frame}</span></li>`).join('');
+    }
+    
+    function renderHeatGrid(slots) {
+      window._heatSlots = slots;
+      const card = document.getElementById('heatCard');
+      const grid = document.getElementById('heatGrid');
+      if (!slots || !slots.length) { card.style.display = 'none'; grid.innerHTML=''; return; }
+      card.style.display = '';
+      grid.innerHTML = slots.map(s =>
+        `<div class="item"><img id="heat_${s}" src="/api/heatmap/${s}?t=${Date.now()}" alt="P${s}" />
+         <div class="label">Player ${s}</div></div>`).join('');
+    }
+
+    // ---- GPU analysis ----------------------------------------------------
+    function analyzeVideo() {
+      const input = document.getElementById('srcInput').value.trim();
+      if (!input) return;
+      const video = input.startsWith('/') ? input : '/mnt/pi-recordings/' + input;
+      document.getElementById('feed').src = '';
+      fetch('/api/gpu/start', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ video, skip: 5 })
+      }).then(r => r.json()).then(d => {
+        if (d.ok) {
+          document.getElementById('feed').src = '/gpu_feed?t='+Date.now();
+        } else {
+          alert('Error: ' + (d.error || 'unknown'));
+        }
+      });
+    }
+
+    // ---- webcam toggle ----------------------------------------------------
+    let _webcamStream = null;
+    async function toggleCam() {
+      const btn = document.getElementById('camToggle');
+      const img = document.getElementById('feed');
+      const vid = document.getElementById('webcam');
+      if (_webcamStream) {
+        _webcamStream.getTracks().forEach(t => t.stop());
+        _webcamStream = null;
+        vid.style.display = 'none'; img.style.display = '';
+        btn.classList.remove('active');
+        btn.querySelector('span').textContent = 'My Camera';
+        return;
+      }
+      try {
+        _webcamStream = await navigator.mediaDevices.getUserMedia({ video: { width: 1920, height: 1080 } });
+        vid.srcObject = _webcamStream;
+        vid.style.display = ''; img.style.display = 'none';
+        btn.classList.add('active');
+        btn.querySelector('span').textContent = 'Analysis Feed';
+      } catch (e) { alert('Could not access camera: ' + e.message); }
+    }
+  </script>
+</body>
+</html>

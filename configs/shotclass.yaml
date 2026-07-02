@@ -1,0 +1,66 @@
+# ============================================================================
+# data.yaml + training config — SHOT CLASSIFICATION (YOLOv26 detection)
+# Dataset: combined padelTracker100 (auto-labeled via pose JSONs) + Roboflow
+# padel-ball-hit (remapped). Built by scripts/build_shotclass_combined.py.
+#
+# 9 shot-type classes: Forehand, Backhand, Smash, Serve, Volley, Lob,
+# Wall shot, Other, Dropshot.
+# This model detects shot events AND classifies the type in one pass.
+# At inference, it runs alongside the body-pose model for fused accuracy.
+#
+# Train with: python src/train.py --task shotclass
+# ============================================================================
+
+base: yolo26n.pt
+
+path: ./data/datasets/shotclass_combined
+train: images/train
+val: images/val
+test: images/val
+
+nc: 9
+names:
+  0: Forehand
+  1: Backhand
+  2: Smash
+  3: Serve
+  4: Volley
+  5: Lob
+  6: Wall shot
+  7: Other
+  8: Dropshot
+
+hyp:
+  name: shotclass
+  imgsz: 640
+  epochs: 200
+  batch: 8
+  device: 0
+  workers: 8
+  optimizer: auto
+  cos_lr: true
+  warmup_epochs: 3.0
+  patience: 50
+  seed: 42
+  deterministic: true
+  amp: true
+
+  # Augmentation
+  mosaic: 1.0
+  close_mosaic: 15
+  mixup: 0.15
+  copy_paste: 0.0
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+  degrees: 0.0
+  translate: 0.1
+  scale: 0.5
+  shear: 0.0
+  perspective: 0.0
+  flipud: 0.0
+  fliplr: 0.5
+
+  box: 7.5
+  cls: 0.5
+  dfl: 1.5

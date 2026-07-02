@@ -1,0 +1,62 @@
+# ============================================================================
+# data.yaml — PLAYER DETECTION (YOLOv26 detection head)
+# Used by: scripts/train_detection.sh  ->  src/train.py --task detection
+# Roboflow datasets usually ship their own data.yaml; this is a clean
+# canonical version. Keep `path` pointing at the extracted dataset root.
+# ============================================================================
+
+# Base pretrained weights (change here if yolo26 is not yet released)
+# Detection variants: yolo26n.pt / yolo26s.pt / yolo26m.pt ...
+base: yolo26n.pt
+
+# Dataset root (relative to project root). download_data.py extracts here.
+path: ./data/datasets/players
+train: train/images
+val: valid/images
+test: test/images
+
+# Classes ---------------------------------------------------------------------
+# Padel players. Extend (e.g. referee, coach) if your dataset has more.
+# IMPORTANT: keep this order identical to your Roboflow class export order.
+nc: 1
+names:
+  0: player
+
+# Training hyperparameters — ACCURACY-MAXIMIZING (tuned for 4 GB GPU) ----------
+# Mosaic + mixup + copy_paste greatly improve small/occluded-player detection.
+# Override any of these on the CLI: python src/train.py --task detection epochs=120
+hyp:
+  imgsz: 640
+  epochs: 100
+  batch: 8            # 4 GB VRAM — auto-restarted at 4 by scripts if OOM occurs
+  device: 0
+  workers: 8
+  optimizer: auto
+  lr0: 0.0025         # 'auto' picks AdamW/SGD and scales by batch/nbs
+  cos_lr: true
+  warmup_epochs: 3.0
+  patience: 30        # early stopping (resumable via last.pt)
+  seed: 42
+  deterministic: true
+  amp: true           # mixed precision (essential for 4 GB)
+
+  # ---- Augmentation: the accuracy multipliers ----
+  mosaic: 1.0          # 4-image mosaic
+  close_mosaic: 15     # disable mosaic for last 15 epochs (finer localization)
+  mixup: 0.15          # blend images
+  copy_paste: 0.15     # paste players into new contexts (handles occlusion)
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+  degrees: 0.0
+  translate: 0.1
+  scale: 0.5
+  shear: 0.0
+  perspective: 0.0
+  flipud: 0.0
+  fliplr: 0.5
+
+  # Loss gains (Ultralytics defaults are well-tuned; kept for clarity)
+  box: 7.5
+  cls: 0.5
+  dfl: 1.5

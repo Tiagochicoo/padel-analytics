@@ -1,0 +1,140 @@
+{# _nav.html — shared collapsible sidebar navigation (included by every page).
+   Requires: brand (dict with name, tagline, accent, accent2, logo), nav_active (string). #}
+<style>
+  #sidenav {
+    position: fixed; top: 0; left: 0; bottom: 0; width: var(--nav-w, 220px);
+    background: var(--sn-bg, #0d1117); border-right: 1px solid #30363d;
+    display: flex; flex-direction: column; z-index: 100;
+    transition: width .2s ease; overflow: hidden;
+  }
+  #sidenav .sn-brand {
+    display: flex; align-items: center; gap: 10px; padding: 16px 18px;
+    border-bottom: 1px solid #30363d; white-space: nowrap; overflow: hidden;
+  }
+  #sidenav .sn-brand .sn-logo {
+    width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+    background: linear-gradient(135deg, {{ brand.accent }}, {{ brand.accent2 }});
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800; color: #fff;
+  }
+  #sidenav .sn-brand .sn-btext { overflow: hidden; }
+  #sidenav .sn-brand .sn-bname { font-size: 14px; font-weight: 700; color: #c9d1d9; }
+  #sidenav .sn-brand .sn-btag  { font-size: 10px; color: #8b949e; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+
+  #sidenav .sn-items { flex: 1; padding: 10px 0; overflow-y: auto; overflow-x: hidden; }
+  #sidenav .sn-item {
+    display: flex; align-items: center; gap: 12px; padding: 10px 18px;
+    color: #8b949e; text-decoration: none; font-size: 14px; white-space: nowrap;
+    transition: background .12s, color .12s; cursor: pointer; border: 0; width: 100%;
+    text-align: left; background: transparent;
+  }
+  #sidenav .sn-item:hover { background: #161b22; color: #c9d1d9; }
+  #sidenav .sn-item.active { color: {{ brand.accent }}; background: rgba(34,211,238,0.08); }
+  #sidenav .sn-item.active .sn-ico { color: {{ brand.accent }}; }
+  #sidenav .sn-ico { width: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  #sidenav .sn-ico svg { width: 18px; height: 18px; }
+  #sidenav .sn-lbl { overflow: hidden; text-overflow: ellipsis; }
+
+  #sidenav .sn-footer { border-top: 1px solid #30363d; padding: 10px; }
+  #sidenav .sn-toggle {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 8px; cursor: pointer; color: #8b949e; font-size: 12px; width: 100%;
+  }
+  #sidenav .sn-toggle:hover { color: #c9d1d9; }
+  #sidenav .sn-toggle svg { width: 16px; height: 16px; transition: transform .2s; }
+
+  /* collapsed state */
+  body.sn-collapsed { --nav-w: 60px; }
+  body.sn-collapsed #sidenav .sn-btext,
+  body.sn-collapsed #sidenav .sn-lbl,
+  body.sn-collapsed #sidenav .sn-toggle .sn-tlbl { display: none; }
+  body.sn-collapsed #sidenav .sn-brand { justify-content: center; padding: 16px 0; }
+  body.sn-collapsed #sidenav .sn-item { justify-content: center; padding: 10px 0; }
+  body.sn-collapsed #sidenav .sn-toggle { justify-content: center; }
+  body.sn-collapsed #sidenav .sn-toggle svg { transform: rotate(180deg); }
+
+  /* offset page content */
+  body.has-sidenav { padding-left: var(--nav-w, 220px); transition: padding-left .2s ease; }
+
+  /* mobile: sidebar becomes an overlay */
+  @media (max-width: 768px) {
+    body.has-sidenav { padding-left: 0; }
+    /* reserve space for the hamburger button so it doesn't overlap page headers */
+    body.has-sidenav header { padding-left: 52px; }
+    #sidenav { transform: translateX(-100%); box-shadow: 4px 0 24px rgba(0,0,0,.5); }
+    body.sn-mobile-open #sidenav { transform: translateX(0); }
+    body.sn-collapsed #sidenav { width: 220px; }
+    body.sn-collapsed #sidenav .sn-btext,
+    body.sn-collapsed #sidenav .sn-lbl,
+    body.sn-collapsed #sidenav .sn-toggle .sn-tlbl { display: block; }
+    .sn-mobile-toggle { display: flex !important; }
+  }
+  .sn-mobile-toggle {
+    display: none; position: fixed; top: 12px; left: 12px; z-index: 101;
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 8px 10px; cursor: pointer; color: #c9d1d9;
+  }
+  .sn-mobile-toggle svg { width: 20px; height: 20px; }
+  .sn-backdrop {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 99;
+  }
+  body.sn-mobile-open .sn-backdrop { display: block; }
+</style>
+
+<aside id="sidenav">
+  <div class="sn-brand">
+    <div class="sn-logo">
+      {% if brand.logo %}<img src="{{ brand.logo }}" alt="" style="width:100%;height:100%;border-radius:8px" />{% else %}{{ brand.name[:1]|upper }}{% endif %}
+    </div>
+    <div class="sn-btext">
+      <div class="sn-bname">{{ brand.name }}</div>
+      <div class="sn-btag">{{ brand.tagline }}</div>
+    </div>
+  </div>
+  <div class="sn-items">
+    <a class="sn-item {{ 'active' if nav_active=='live' else '' }}" href="/">
+      <span class="sn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></span>
+      <span class="sn-lbl">Live</span>
+    </a>
+    <a class="sn-item {{ 'active' if nav_active=='gpu_live' else '' }}" href="/gpu_live">
+      <span class="sn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></span>
+      <span class="sn-lbl">⚡ GPU Live</span>
+    </a>
+    <a class="sn-item {{ 'active' if nav_active=='training' else '' }}" href="/training">
+      <span class="sn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 6-6"/></svg></span>
+      <span class="sn-lbl">Training</span>
+    </a>
+    <a class="sn-item {{ 'active' if nav_active=='admin' else '' }}" href="/admin">
+      <span class="sn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+      <span class="sn-lbl">Admin</span>
+    </a>
+    <a class="sn-item {{ 'active' if nav_active=='report' else '' }}" href="/report">
+      <span class="sn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>
+      <span class="sn-lbl">Reports</span>
+    </a>
+  </div>
+  <div class="sn-footer">
+    <button class="sn-toggle" onclick="snToggle()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      <span class="sn-tlbl">Collapse</span>
+    </button>
+  </div>
+</aside>
+
+<button class="sn-mobile-toggle" onclick="document.body.classList.toggle('sn-mobile-open')">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+</button>
+<div class="sn-backdrop" onclick="document.body.classList.remove('sn-mobile-open')"></div>
+
+<script>
+  (function() {
+    document.body.classList.add('has-sidenav');
+    if (localStorage.getItem('sn-collapsed') === '1')
+      document.body.classList.add('sn-collapsed');
+  })();
+  function snToggle() {
+    document.body.classList.toggle('sn-collapsed');
+    localStorage.setItem('sn-collapsed', document.body.classList.contains('sn-collapsed') ? '1' : '0');
+  }
+</script>
